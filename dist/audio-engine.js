@@ -12,6 +12,7 @@ const DEFAULTS = Object.freeze({
   target: 6,
   audioMode: 'binaural',
   binauralModulation: false,
+  soundTexture: 'pure',
   volume: 0.25,
   ambience: 0,
 });
@@ -39,6 +40,11 @@ export function validateConfig(config = {}) {
   if (typeof result.binauralModulation !== 'boolean') {
     throw new TypeError('binauralModulation must be a boolean.');
   }
+  if (!['pure', 'ethereal'].includes(result.soundTexture)) {
+    throw new TypeError('soundTexture must be pure or ethereal.');
+  }
+  // A stale ambience slider must never add sound to the pure reference mode.
+  if (result.soundTexture === 'pure') result.ambience = 0;
   if (result.audioMode === 'binaural'
     && (result.carrier - result.target / 2 < 20 || result.carrier + result.target / 2 > 20000)) {
     throw new RangeError('Both binaural carriers must be between 20 and 20000 Hz.');
@@ -154,12 +160,55 @@ export class NeuroAudioEngine {
     return pulse;
   }
 
+  _etherealPad(merger) {
+    const context = this._context;
+    const now = context.currentTime;
+    const { left, right } = this.frequencies;
+    for (const [channel, fundamental] of [left, right].entries()) {
+      const padBus = this._track(context.createGain());
+      padBus.gain.setValueAtTime(1, now);
+      let harmonics = 0;
+      for (const harmonic of [2, 3]) {
+        const frequency = fundamental * harmonic;
+        if (frequency >= Math.min(20000, context.sampleRate / 2)) continue;
+        const oscillator = this._oscillator(frequency);
+        const harmonicGain = this._track(context.createGain());
+        harmonicGain.gain.setValueAtTime(this._config.ambience * 0.18 / harmonic, now);
+        oscillator.connect(harmonicGain);
+        harmonicGain.connect(padBus);
+        harmonics++;
+      }
+      if (!harmonics) continue;
+      // Only this quiet harmonic branch enters the short parallel combs.
+      // The fundamental stays dry, and every return stays in its own channel.
+      padBus.connect(merger, 0, channel);
+      for (const [index, seconds] of [0.043, 0.071, 0.113].entries()) {
+        const delay = this._track(context.createDelay(0.2));
+        const damping = this._track(context.createBiquadFilter());
+        const feedback = this._track(context.createGain());
+        const wet = this._track(context.createGain());
+        delay.delayTime.setValueAtTime(seconds, now);
+        damping.type = 'lowpass';
+        damping.frequency.setValueAtTime(Math.min(3500, context.sampleRate * 0.45), now);
+        damping.Q.setValueAtTime(0.45, now);
+        feedback.gain.setValueAtTime(0.42 - index * 0.04, now);
+        wet.gain.setValueAtTime(0.13, now);
+        padBus.connect(delay);
+        delay.connect(damping);
+        damping.connect(feedback);
+        feedback.connect(delay);
+        damping.connect(wet);
+        wet.connect(merger, 0, channel);
+      }
+    }
+  }
+
   async start(config = {}) {
     const normalized = validateConfig(config);
     return this._enqueue(async () => {
       await this._stop();
       if (typeof this._AudioContext !== 'function') {
-        throw new Error('Este navegador não oferece suporte ao áudio necessário.');
+        throw new Error('This browser does not support the required audio features.');
       }
       this._config = normalized;
       this._storedElapsed = 0;
@@ -169,10 +218,10 @@ export class NeuroAudioEngine {
         this._context = context;
         await context.resume();
         if (context.state !== 'running') {
-          throw new Error('O áudio não foi liberado pelo navegador. Toque em iniciar novamente.');
+          throw new Error('The browser did not allow audio playback. Press start again.');
         }
         if (Math.max(this.frequencies.left, this.frequencies.right) >= context.sampleRate / 2) {
-          throw new RangeError('A frequência escolhida supera a capacidade de áudio deste dispositivo.');
+          throw new RangeError('The selected frequency exceeds this device’s audio capability.');
         }
         this._referenceTime = context.currentTime + SCHEDULE_LEAD_SECONDS;
         const merger = this._track(context.createChannelMerger(2));
@@ -212,19 +261,7 @@ export class NeuroAudioEngine {
           carrier.connect(merger, 0, 1);
         }
 
-        // Explicitly optional: the default keeps the requested pure carriers.
-        if (normalized.ambience > 0) {
-          for (const harmonic of [2, 3]) {
-            const frequency = normalized.carrier * harmonic;
-            if (frequency >= Math.min(20000, context.sampleRate / 2)) continue;
-            const pad = this._oscillator(frequency);
-            const padGain = this._track(context.createGain());
-            padGain.gain.setValueAtTime(normalized.ambience * 0.035 / harmonic, this._referenceTime);
-            pad.connect(padGain);
-            padGain.connect(merger, 0, 0);
-            padGain.connect(merger, 0, 1);
-          }
-        }
+        if (normalized.soundTexture === 'ethereal' && normalized.ambience > 0) this._etherealPad(merger);
         for (const oscillator of this._oscillators) oscillator.start(this._referenceTime);
         this._state = 'running';
       } catch (error) {
@@ -263,11 +300,11 @@ export class NeuroAudioEngine {
   async resume() {
     return this._enqueue(async () => {
       if (!this._context || this._context.state === 'closed') {
-        throw new Error('Inicie uma sessão antes de continuar.');
+        throw new Error('Start a session before resuming audio.');
       }
       if (this.state === 'running') return;
       await this._context.resume();
-      if (this._context.state !== 'running') throw new Error('Não foi possível retomar o áudio.');
+      if (this._context.state !== 'running') throw new Error('Audio playback could not resume.');
       const now = this._context.currentTime;
       holdParameter(this._envelope.gain, now);
       this._envelope.gain.setValueAtTime(0, now);

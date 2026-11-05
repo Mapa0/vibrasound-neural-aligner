@@ -1,72 +1,88 @@
 # Vibrasound · Neural Aligner
 
-Um espaço minimalista de pausa: áudio binaural ou isocrônico gerado em tempo real, acompanhado por partículas cósmicas, órbitas harmônicas ou luz pulsante opcional.
+An evidence-informed frequency generator for quiet focus and relaxation, built on established acoustics and transparent mathematical models.
 
-**Aplicação:** [vibrasound.mapazero.com](https://vibrasound.mapazero.com)
+Precise stereo tones, a choice of pure or atmospheric sound, and gentle visuals create a minimal space to shape your listening experience. The controls disappear during a session and return when you move, touch, or use the keyboard.
 
-## Usar
+**Open the app:** [vibrasound.mapazero.com](https://vibrasound.mapazero.com)
 
-A aplicação abre diretamente no painel, com a logo no topo. Escolha o ritmo, a frequência base, o modo sonoro e a cor. Inicie a sessão: os controles desaparecem após alguns segundos e voltam ao mover o cursor, tocar ou navegar pelo teclado.
+## Make it yours
 
-- Preset inicial: portadora **528 Hz** e ritmo **6 Hz**.
-- Binaural: **525 Hz no canal esquerdo / 531 Hz no direito**. Use fones estéreo.
-- Binaural com modulação opcional: preserva os tons separados e aplica pulsos de volume ao ritmo escolhido. Ative “Modular o binaural” nos ajustes finos.
-- Isocrônico: portadora senoidal em ambos os canais, modulada em amplitude a 6 Hz.
-- Presets Theta, Alpha e Delta; frequências, cor, duração, volume e intensidade personalizáveis.
-- Sessão livre ou temporizada, pausa, retomada, silenciamento e tela cheia.
-- Espaço pausa/retoma; Esc encerra. Ao trocar de aba, a sessão pausa.
-- Preferências ficam apenas no navegador. A sincronização luminosa nunca é restaurada automaticamente.
+Choose a rhythm, a base tone, an audio mode, and a visual. The starting preset is **528 Hz with a 6 Hz rhythm**. Color is automatically derived from the base tone through an octave mapping.
 
-O padrão visual é contínuo, sem flashes rítmicos. “Sincronizar visual ao ritmo” é uma escolha explícita nos ajustes finos: tamanho, movimento e brilho acompanham a fase do áudio. **Luz e padrões pulsantes podem provocar crises em pessoas fotossensíveis**, inclusive quando chamados de “suaves”. Use volume confortável.
+- **Binaural:** 525 Hz in the left ear and 531 Hz in the right ear at the default preset. Use stereo headphones.
+- **Isochronic:** the base tone rises and falls in volume at the selected rhythm. Works with headphones or speakers.
+- **Sound texture:** Pure tone keeps the reference signal clear; Ethereal adds a quiet harmonic atmosphere. Adjust Atmosphere level to taste.
+- **Visuals:** Cosmic dust, Harmonic orbits, Liquid waves, and optional Soft strobe. Flow speed and Wave spread shape the liquid scene.
+- **Session controls:** optional binaural volume modulation, volume, and session duration are directly available in the main panel.
+- **Advanced controls:** visual synchronization, intensity, Flow speed, Wave spread, and Atmosphere level.
+- **Playback:** pause, resume, mute, fullscreen, and free or timed sessions. Space pauses or resumes; Esc ends the session. Switching tabs pauses playback.
 
-## Precisão e limites
+Preferences stay in your browser. Rhythmic visual synchronization starts off each time the page opens. Continuous visual flow is the default; synchronized light and patterns are an explicit choice. Pulsing light or patterns can trigger seizures in photosensitive people. Keep the continuous setting if this applies to you, and listen at a comfortable volume.
 
-Todo tempo de fase é expresso em **segundos**. O áudio usa os osciladores nativos do Web Audio, e a modulação isocrônica é calculada pelo motor de áudio, sem timers de JavaScript. Um `PeriodicWave` cossenoidal alinha a fase inicial do LFO à envoltória visual.
+## How it works
+
+The sound engine generates the selected tones directly in the browser. Binaural mode sends a slightly different tone to each ear; isochronic mode changes a tone's volume rhythmically. Optional binaural modulation combines both approaches. These are defined acoustic signals, with every phase calculation expressed in **seconds**: 6 Hz means six cycles per second.
+
+Research has measured brain responses to rhythmic sound and visual motion. The studies provide a useful basis for the design; effects depend on the stimulus and the listener. Theta, Alpha, and Delta name conventional frequency ranges, and describe the selected rhythm here. The app generates a stimulus and provides a place to relax; it does not measure your brain state. The supporting research and equations are explained in [SCIENCE.md](SCIENCE.md).
+
+Pure tone is the clearest choice for hearing the reference signal. Ethereal is a comfort option for a fuller sound. Neither setting is presented as more effective at changing brain activity. The selected carrier frequencies and their timing remain the foundation of both textures.
+
+## Color from frequency
+
+Automatic color shifts the **base tone** upward by whole octaves into a visible wavelength range:
 
 ```text
-L(t) = sin(2π(f₀ − f/2)t)
-R(t) = sin(2π(f₀ + f/2)t)
-g(t) = 0.5 + 0.5 cos(2πft)
-visual(t) = 0.5 + 0.3 cos(2πft)
+light_frequency = base_tone × 2^n
+wavelength_nm = 299792458 × 10^9 / light_frequency
+choose whole octaves to place wavelength between 380 and 760 nm
 ```
 
-A intensidade visual reduz a contribuição luminosa da envoltória. O modo Órbitas usa curvas de Lissajous como representação matemática, sem alegação terapêutica. O renderizador usa `requestAnimationFrame`, resolução limitada e qualidade adaptativa para buscar fluidez próxima de 60 FPS; o hardware e o navegador determinam o resultado. O áudio e o cálculo visual compartilham o relógio `AudioContext.currentTime`. Taxa de atualização da tela, latência de saída e Bluetooth impedem garantir sincronização física exata entre som e luz.
+This produces **528 Hz → 516.4 nm, green**, and **432 Hz → 631.2 nm, red**. The resulting wavelength is represented as an approximate screen color. The mapping is a reproducible visual interpretation of the tone; it has no demonstrated brain-state effect. The chosen octave window is a design convention inside the approximate visible range.
 
-A sincronização visual exige taxa de quadros medida maior que duas vezes o ritmo solicitado. Por exemplo, uma tela de 60 Hz não pode representar um pulso de 40 Hz fielmente: a opção fica indisponível e o visual permanece contínuo, com o limite indicado no painel. A frequência sonora não é alterada. O renderizador também interrompe a pulsação se o desempenho cair abaixo desse limite.
+## Timing and verification
 
-A renderização real dos três modos foi comparada às fórmulas amostra por amostra, em 48 kHz. O relatório e o procedimento para repetir essa verificação estão em [validation/](validation/README.md).
+Audio and synchronized visuals use the same audio clock. Slow visual flow and wave spread shape the scene independently of the selected rhythm. Screen refresh rate, device latency, and Bluetooth affect the physical timing you experience. The renderer aims for fluid motion and adapts its quality to the device.
 
-**6 Hz descreve o estímulo, não uma frequência cerebral medida.** A evidência de arrastamento binaural é heterogênea. 528 Hz é uma escolha sonora, sem benefício terapêutico específico estabelecido. Não há EEG nem medição de estado cerebral na aplicação. Veja [SCIENCE.md](SCIENCE.md) para referências e limitações.
+Visual synchronization requires a measured frame rate greater than twice the requested rhythm. A 60 Hz display cannot faithfully present a 40 Hz visual pulse. When the measured frame rate is insufficient, the visual stays continuous and the audio frequency remains unchanged.
 
-## Executar localmente
+The stored [signal report and reproduction guide](validation/README.md) cover Pure tone and Ethereal across binaural, modulated binaural, and isochronic modes at 48 kHz. Checks include stereo separation, reference-waveform accuracy, preserved carrier components, added harmonics, and pause/resume behavior. This verifies the digital signal; a person's physiological response is outside that measurement.
 
-Requer Node.js 18+ e Python 3. Sem dependências de produção nem etapa de compilação.
+## Run locally
+
+Use Node.js 22+ and Python 3. There are no production dependencies or build step.
 
 ```sh
 npm run dev
-# Abrir http://localhost:8788
+# Open http://localhost:8788
+```
 
+Run the checks:
+
+```sh
 npm test
 npm run check
 ```
 
-O áudio precisa de uma interação do usuário e de uma origem segura (HTTPS ou localhost). Recomenda-se navegador recente com Web Audio e Canvas 2D. A aplicação não coleta dados, não requer conta e não envia áudio ao servidor. As fontes são hospedadas junto da aplicação.
+Audio starts after a user interaction. Use HTTPS or localhost and a current browser with Web Audio and Canvas 2D. No account is needed. Audio is generated locally; the app does not upload it or collect session data. Fonts are hosted with the app.
 
-## Estrutura
+## Project files
 
 ```text
-dist/index.html        Interface e informações da experiência
-dist/styles.css        Layout responsivo e modo imersivo
-dist/app.js            Controles e ciclo de vida da sessão
-dist/audio-engine.js   Osciladores estéreo, modulação e relógio
-dist/visualizer.js     Partículas, órbitas e envoltória visual
-tests/                 Testes do motor e das fórmulas
-SCIENCE.md             Evidências e limites
-deploy/                Configuração de publicação em Nginx
+dist/index.html        Interface and experience information
+dist/styles.css        Responsive layout and immersive mode
+dist/app.js            Controls and session lifecycle
+dist/audio-engine.js   Stereo tones, modulation, and audio clock
+dist/visualizer.js     Cosmic, orbital, liquid, and pulsing visuals
+dist/octave-color.js   Base-tone to wavelength and screen-color mapping
+tests/                 Audio, color, and mathematical checks
+validation/            Reproducible digital-signal report
+SCIENCE.md             Research, equations, and practical limits
+deploy/                Nginx deployment configuration
 ```
 
-`dist/` é o site completo. Pode ser hospedado em qualquer serviço estático com HTTPS. `.openai/hosting.json` também permite publicação via Sites.
+`dist/` is the complete static site. It can be served by any HTTPS static host. `.openai/hosting.json` also supports Sites publication.
 
-## Licença
+## License
 
-MIT. DM Sans e Instrument Serif usam SIL Open Font License; os textos das licenças estão em `dist/fonts/`.
+MIT. DM Sans and Instrument Serif use the SIL Open Font License; the license texts are included in `dist/fonts/`.

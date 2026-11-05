@@ -34,6 +34,8 @@ class AudioContextMock {
   }
   createOscillator() { const n = new Oscillator(); this.nodes.push(n); return n; }
   createGain() { const n = new Node('gain'); this.nodes.push(n); return n; }
+  createDelay(maximum) { const n = new Node('delay'); n.delayTime = new Parameter(); n.maximum = maximum; this.nodes.push(n); return n; }
+  createBiquadFilter() { const n = new Node('filter'); n.frequency = new Parameter(); n.Q = new Parameter(); this.nodes.push(n); return n; }
   createChannelMerger(channels) { const n = new Node('merger'); n.channels = channels; this.nodes.push(n); return n; }
   createPeriodicWave(real, imaginary, options) { return { real, imaginary, options }; }
   async resume() { this.state = 'running'; }
@@ -65,10 +67,60 @@ test('invalid and nonfinite audio settings cannot reach the audio graph', () => 
   for (const config of [
     { target: 0 }, { target: NaN }, { carrier: Infinity },
     { carrier: 20, target: 6 }, { volume: -0.1 }, { volume: 1.1 },
-    { audioMode: 'unknown' }, { ambience: '0' }, { binauralModulation: 1 }, null,
+    { audioMode: 'unknown' }, { ambience: '0' }, { binauralModulation: 1 }, { soundTexture: 'unknown' }, null,
   ]) assert.throws(() => validateConfig(config));
   assert.throws(() => pulseAt(6, -1));
   assert.throws(() => pulseAt(6, 1000 / 0));
+});
+
+test('pure texture removes stale ambience and ethereal ambience stays explicitly optional', async () => {
+  assert.equal(validateConfig({ ambience: 1 }).ambience, 0);
+  assert.equal(validateConfig({ soundTexture: 'ethereal' }).ambience, 0);
+  assert.equal(validateConfig({ soundTexture: 'ethereal', ambience: 0.35 }).ambience, 0.35);
+  const engine = new NeuroAudioEngine({ AudioContext: AudioContextMock });
+  await engine.start({ soundTexture: 'pure', ambience: 1 });
+  const context = AudioContextMock.latest;
+  assert.deepEqual(context.nodes.filter(n => n.kind === 'oscillator').map(n => n.frequency.value), [525, 531]);
+  assert.equal(context.nodes.filter(n => n.kind === 'delay').length, 0);
+  await engine.pause();
+  await engine.stop();
+});
+
+test('ethereal texture adds quiet channel-specific harmonics and reverb while leaving the core dry', async () => {
+  const engine = new NeuroAudioEngine({ AudioContext: AudioContextMock });
+  await engine.start({ soundTexture: 'ethereal', ambience: 0.35 });
+  const context = AudioContextMock.latest;
+  const oscillators = context.nodes.filter(n => n.kind === 'oscillator');
+  const left = oscillators.find(n => n.frequency.value === 525);
+  const right = oscillators.find(n => n.frequency.value === 531);
+  const merger = left.connections[0].destination;
+  assert.equal(merger.kind, 'merger');
+  assert.equal(right.connections[0].destination, merger);
+  assert.deepEqual(left.connections.map(c => c.input), [0]);
+  assert.deepEqual(right.connections.map(c => c.input), [1]);
+  assert.deepEqual(oscillators.map(n => n.frequency.value), [525, 531, 1050, 1575, 1062, 1593]);
+  assert.equal(context.nodes.filter(n => n.kind === 'delay').length, 6);
+  assert.ok(context.nodes.filter(n => n.kind === 'filter').every(n => n.type === 'lowpass'));
+
+  const mergerInputsReachableFrom = (node, visited = new Set()) => {
+    if (visited.has(node)) return [];
+    visited.add(node);
+    return node.connections.flatMap(connection => connection.destination === merger
+      ? [connection.input]
+      : mergerInputsReachableFrom(connection.destination, visited));
+  };
+  for (const [frequency, channel, harmonic] of [[1050, 0, 2], [1575, 0, 3], [1062, 1, 2], [1593, 1, 3]]) {
+    const oscillator = oscillators.find(n => n.frequency.value === frequency);
+    const harmonicGain = oscillator.connections[0].destination;
+    assert.ok(Math.abs(harmonicGain.gain.value - 0.35 * 0.18 / harmonic) < 1e-12);
+    const inputs = mergerInputsReachableFrom(oscillator);
+    assert.equal(inputs.length, 4);
+    assert.ok(inputs.every(input => input === channel));
+    assert.equal(oscillator.startTime, left.startTime);
+  }
+  await engine.pause();
+  await engine.stop();
+  assert.ok(context.nodes.every(n => n.disconnected));
 });
 
 test('binaural engine routes isolated sine oscillators to the two stereo inputs', async () => {

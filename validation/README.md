@@ -1,34 +1,42 @@
-# Verificação do sinal de áudio
+# Audio signal verification
 
-O relatório [audio-signal.json](./audio-signal.json) registra uma execução aprovada no Chromium. O verificador usa o motor de produção com o `OfflineAudioContext` nativo para renderizar os canais e inspecionar suas amostras. Também verifica pausa, retomada e encerramento com um `AudioContext` real.
+The [audio-signal.json](./audio-signal.json) report records a passing Chromium run. The verifier renders the production audio engine through native `OfflineAudioContext` and inspects the channel samples. It also checks pause, resume, and stop using a live `AudioContext`.
 
-O preset 528/6 é conferido em três condições: binaural puro com canais de 525 e 531 Hz; isocrônico com portadora de 528 Hz e modulação de 6 Hz; binaural com modulação adicional opcional. As verificações incluem separação estéreo, forma de onda, bandas laterais esperadas e ausência do erro de escala que geraria 6.000 Hz.
+The 528/6 preset is checked in both Pure tone and Ethereal across binaural with 525 Hz left and 531 Hz right; isochronic with a 528 Hz carrier and 6 Hz volume modulation; and binaural with optional additional volume modulation. Checks cover stereo separation, reference-waveform accuracy, expected modulation components, Ethereal harmonics, preservation of carrier components, and the absence of the unit-conversion error that would produce a 6,000 Hz tone. The Ethereal renders use an Atmosphere level setting of 35%.
 
-Isso verifica o sinal digital e o funcionamento do motor no navegador. Não mede a saída acústica dos fones, atividade cerebral, benefício terapêutico ou resposta fisiológica.
+This report verifies the digital Pure tone and Ethereal signals and engine behavior in a browser. It does not measure acoustic headphone output, visual physiology, brain activity, or therapeutic outcomes.
 
-## Reproduzir
+## Reproduce
 
-Use Node.js 22 ou superior. Execute os comandos a partir da raiz do projeto.
+Use Node.js 22 or later. Run these commands from the project root.
 
-Instale a ferramenta opcional e seu navegador:
+Install the optional tool and its browser:
 
 ```sh
 npm install --no-save playwright
 npx playwright install chromium
 ```
 
-Inicie a aplicação e mantenha este terminal aberto:
+Start the app and leave this terminal open:
 
 ```sh
 npm run dev
 ```
 
-Em outro terminal, execute:
+In another terminal, run:
 
 ```sh
 node validation/render-audio.mjs
 ```
 
-Uma execução aprovada imprime `passed: true` e atualiza `validation/audio-signal.json`. Qualquer asserção reprovada encerra o processo com erro. Pequenas diferenças numéricas entre versões do Chromium são esperadas dentro das tolerâncias definidas.
+A passing run prints `passed: true` and updates `validation/audio-signal.json`. A failed assertion exits with an error. Small numerical differences between Chromium versions are expected within the declared tolerances.
 
-O endereço padrão é `http://localhost:8788`. Para outro servidor, configure `SITE_URL`. Para um Chromium já instalado, configure `BROWSER_EXECUTABLE` com o caminho do executável; caso contrário, o Playwright usa seu navegador instalado.
+The default address is `http://localhost:8788`. Set `SITE_URL` to use another server. Set `BROWSER_EXECUTABLE` to use an existing Chromium executable; otherwise, Playwright uses its installed browser.
+
+## Method and scope
+
+Each offline render contains four seconds of stereo audio at 48 kHz. Frequency and component measurements use a two-second window after the initial fade-in. The verifier compares samples against the intended waveform and estimates the pure binaural frequencies from positive zero crossings. The lifecycle adapter changes only offline context startup and shutdown behavior; the nodes, oscillators, connections, automation, and rendered samples come from the production engine and Chromium.
+
+For Ethereal, the verifier confirms that the carrier and modulation components match the corresponding Pure tone render while the additional harmonics are present. In the stored run, the largest measured change in a carrier amplitude was below `6 × 10⁻¹¹`; the sampled opposite-channel harmonic amplitudes in the Ethereal binaural renders stayed below `3 × 10⁻⁹`. These are normalized digital amplitudes from this measurement window. The reported waveform-error fields compare against the pure reference: Ethereal intentionally differs because it contains added harmonics. The isochronic channels share the same carriers and harmonics, so those components are not interpreted as unwanted channel leakage.
+
+The live lifecycle check confirms that audio time stops advancing while suspended and continues after resume. Its recorded clock values depend on the machine and are not clinical measurements.

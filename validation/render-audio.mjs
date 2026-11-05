@@ -59,7 +59,7 @@ try {
       return Math.sqrt(squaredError / squaredSignal);
     };
 
-    const measure = async (audioMode, binauralModulation = false) => {
+    const measure = async (audioMode, binauralModulation = false, soundTexture = 'pure', ambience = 0) => {
       let offline;
       // Only adapt lifecycle methods: every node, connection, oscillator,
       // automation event and rendered sample comes from the production engine
@@ -73,7 +73,7 @@ try {
         return offline;
       }
       const engine = new NeuroAudioEngine({ AudioContext: OfflineContextAdapter });
-      await engine.start({ carrier: 528, target: 6, volume: 0.25, audioMode, binauralModulation });
+      await engine.start({ carrier: 528, target: 6, volume: 0.25, audioMode, binauralModulation, soundTexture, ambience });
       const rendered = await offline.startRendering();
       const left = rendered.getChannelData(0);
       const right = rendered.getChannelData(1);
@@ -98,8 +98,14 @@ try {
         lowerSideband522Amplitude: amplitudeAt(left, 522),
         upperSideband534Amplitude: amplitudeAt(left, 534),
         accidental6000HzAmplitude: amplitudeAt(left, 6000),
+        left1050Amplitude: amplitudeAt(left, 1050),
+        left1575Amplitude: amplitudeAt(left, 1575),
+        right1062Amplitude: amplitudeAt(right, 1062),
+        right1593Amplitude: amplitudeAt(right, 1593),
+        wrongChannelLeft1062Amplitude: amplitudeAt(left, 1062),
+        wrongChannelRight1050Amplitude: amplitudeAt(right, 1050),
       };
-      if (audioMode === 'binaural' && !binauralModulation) {
+      if (audioMode === 'binaural' && !binauralModulation && soundTexture === 'pure') {
         measured.leftFrequencyHz = zeroCrossingFrequency(left);
         measured.rightFrequencyHz = zeroCrossingFrequency(right);
       }
@@ -110,6 +116,9 @@ try {
     const binaural = await measure('binaural');
     const isochronic = await measure('isochronic');
     const modulatedBinaural = await measure('binaural', true);
+    const etherealBinaural = await measure('binaural', false, 'ethereal', 0.35);
+    const etherealModulatedBinaural = await measure('binaural', true, 'ethereal', 0.35);
+    const etherealIsochronic = await measure('isochronic', false, 'ethereal', 0.35);
 
     // Exercise real browser AudioContext suspension, not the offline adapter.
     const liveEngine = new NeuroAudioEngine();
@@ -129,6 +138,9 @@ try {
       binaural,
       isochronic,
       modulatedBinaural,
+      etherealBinaural,
+      etherealModulatedBinaural,
+      etherealIsochronic,
       lifecycle: { runningClock, pausedClock, stillPausedClock, pausedState, resumedClock, finalState: liveEngine.state },
     };
   });
@@ -155,6 +167,24 @@ try {
   assert.ok(Math.abs(result.isochronic.lowerSideband522Amplitude - 0.01) < 1e-5);
   assert.ok(Math.abs(result.isochronic.upperSideband534Amplitude - 0.01) < 1e-5);
   assert.ok(result.isochronic.accidental6000HzAmplitude < 1e-6);
+  // Added atmosphere must preserve the original core level and channel routing.
+  assert.ok(Math.abs(result.etherealBinaural.left525Amplitude - result.binaural.left525Amplitude) < 1e-6);
+  assert.ok(Math.abs(result.etherealBinaural.right531Amplitude - result.binaural.right531Amplitude) < 1e-6);
+  assert.ok(result.etherealBinaural.left1050Amplitude > 0.0005);
+  assert.ok(result.etherealBinaural.left1575Amplitude > 0.0003);
+  assert.ok(result.etherealBinaural.right1062Amplitude > 0.0005);
+  assert.ok(result.etherealBinaural.right1593Amplitude > 0.0003);
+  assert.ok(result.etherealBinaural.wrongChannelLeft1062Amplitude < 1e-6);
+  assert.ok(result.etherealBinaural.wrongChannelRight1050Amplitude < 1e-6);
+  assert.ok(result.binaural.left1050Amplitude < 1e-6);
+  assert.ok(result.binaural.right1062Amplitude < 1e-6);
+  assert.ok(Math.abs(result.etherealModulatedBinaural.left525Amplitude - result.modulatedBinaural.left525Amplitude) < 1e-6);
+  assert.ok(Math.abs(result.etherealModulatedBinaural.right531Amplitude - result.modulatedBinaural.right531Amplitude) < 1e-6);
+  assert.ok(Math.abs(result.etherealIsochronic.carrier528Amplitude - result.isochronic.carrier528Amplitude) < 1e-6);
+  assert.ok(Math.abs(result.etherealIsochronic.lowerSideband522Amplitude - result.isochronic.lowerSideband522Amplitude) < 1e-6);
+  assert.ok(Math.abs(result.etherealIsochronic.upperSideband534Amplitude - result.isochronic.upperSideband534Amplitude) < 1e-6);
+  assert.ok(result.etherealIsochronic.stereoDelta < 1e-7);
+  assert.ok(result.etherealBinaural.peak < 0.05);
   assert.equal(result.lifecycle.pausedState, 'paused');
   assert.equal(result.lifecycle.pausedClock, result.lifecycle.stillPausedClock);
   assert.ok(result.lifecycle.resumedClock > result.lifecycle.pausedClock);
