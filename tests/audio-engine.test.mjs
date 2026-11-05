@@ -46,6 +46,7 @@ class AudioContextMock {
 test('default stereo frequencies differ by exactly 6 Hz around 528 Hz', () => {
   assert.deepEqual(getFrequencies(), { left: 525, right: 531, carrier: 528, target: 6 });
   assert.deepEqual(getFrequencies({ audioMode: 'isochronic' }), { left: 528, right: 528, carrier: 528, target: 6 });
+  assert.deepEqual(getFrequencies({ audioMode: 'tone' }), { left: 528, right: 528, carrier: 528, target: 6 });
   const fractional = getFrequencies({ carrier: 432, target: 4.5 });
   assert.equal(fractional.right - fractional.left, 4.5);
 });
@@ -67,10 +68,20 @@ test('invalid and nonfinite audio settings cannot reach the audio graph', () => 
   for (const config of [
     { target: 0 }, { target: NaN }, { carrier: Infinity },
     { carrier: 20, target: 6 }, { volume: -0.1 }, { volume: 1.1 },
-    { audioMode: 'unknown' }, { ambience: '0' }, { binauralModulation: 1 }, { soundTexture: 'unknown' }, null,
+    { audioMode: 'unknown' }, { ambience: '0' }, { binauralModulation: 1 }, { soundTexture: 'unknown' }, { chant: 'unknown' }, { chantUseBaseFrequency: 1 }, null,
   ]) assert.throws(() => validateConfig(config));
   assert.throws(() => pulseAt(6, -1));
   assert.throws(() => pulseAt(6, 1000 / 0));
+});
+
+test('natural voice forces equal source-pitch channels and target-rate modulation despite stale mode preferences', () => {
+  const config = validateConfig({ soundTexture: 'chants', chant: 'MMM', chantUseBaseFrequency: false, audioMode: 'binaural', binauralModulation: true, carrier: 528 });
+  assert.equal(config.audioMode, 'isochronic');
+  assert.equal(config.binauralModulation, false);
+  assert.deepEqual(getFrequencies(config), { left: 89.2428, right: 89.2428, carrier: 89.2428, target: 6 });
+  assert.equal(validateConfig().chantUseBaseFrequency, true);
+  assert.equal(validateConfig({ soundTexture: 'pure', chantUseBaseFrequency: false, audioMode: 'tone' }).audioMode, 'tone');
+  assert.equal(getFrequencies({ soundTexture: 'pure', chantUseBaseFrequency: false }).left, 525);
 });
 
 test('pure texture removes stale ambience and ethereal ambience stays explicitly optional', async () => {
@@ -86,7 +97,7 @@ test('pure texture removes stale ambience and ethereal ambience stays explicitly
   await engine.stop();
 });
 
-test('ethereal texture adds quiet channel-specific harmonics and reverb while leaving the core dry', async () => {
+test('ethereal texture adds a musical channel-specific pad and reverb while leaving the core dry', async () => {
   const engine = new NeuroAudioEngine({ AudioContext: AudioContextMock });
   await engine.start({ soundTexture: 'ethereal', ambience: 0.35 });
   const context = AudioContextMock.latest;
@@ -98,8 +109,8 @@ test('ethereal texture adds quiet channel-specific harmonics and reverb while le
   assert.equal(right.connections[0].destination, merger);
   assert.deepEqual(left.connections.map(c => c.input), [0]);
   assert.deepEqual(right.connections.map(c => c.input), [1]);
-  assert.deepEqual(oscillators.map(n => n.frequency.value), [525, 531, 1050, 1575, 1062, 1593]);
-  assert.equal(context.nodes.filter(n => n.kind === 'delay').length, 6);
+  assert.deepEqual(oscillators.map(n => n.frequency.value), [525, 531, 0.065, 262.5, 393.75, 787.5, 1050, 1575, 265.5, 398.25, 796.5, 1062, 1593]);
+  assert.equal(context.nodes.filter(n => n.kind === 'delay').length, 8);
   assert.ok(context.nodes.filter(n => n.kind === 'filter').every(n => n.type === 'lowpass'));
 
   const mergerInputsReachableFrom = (node, visited = new Set()) => {
@@ -109,18 +120,31 @@ test('ethereal texture adds quiet channel-specific harmonics and reverb while le
       ? [connection.input]
       : mergerInputsReachableFrom(connection.destination, visited));
   };
-  for (const [frequency, channel, harmonic] of [[1050, 0, 2], [1575, 0, 3], [1062, 1, 2], [1593, 1, 3]]) {
+  for (const [frequency, channel, level] of [[1050, 0, 0.16], [1575, 0, 0.10], [1062, 1, 0.16], [1593, 1, 0.10]]) {
     const oscillator = oscillators.find(n => n.frequency.value === frequency);
     const harmonicGain = oscillator.connections[0].destination;
-    assert.ok(Math.abs(harmonicGain.gain.value - 0.35 * 0.18 / harmonic) < 1e-12);
+    assert.ok(Math.abs(harmonicGain.gain.value - 0.35 * level * 1.6) < 1e-12);
     const inputs = mergerInputsReachableFrom(oscillator);
-    assert.equal(inputs.length, 4);
+    assert.equal(inputs.length, 5);
     assert.ok(inputs.every(input => input === channel));
     assert.equal(oscillator.startTime, left.startTime);
   }
   await engine.pause();
   await engine.stop();
   assert.ok(context.nodes.every(n => n.disconnected));
+});
+
+test('single tone ignores a stale binaural modulation preference and duplicates one dry carrier', async () => {
+  assert.equal(validateConfig({ audioMode: 'tone', binauralModulation: true }).binauralModulation, false);
+  const engine = new NeuroAudioEngine({ AudioContext: AudioContextMock });
+  await engine.start({ audioMode: 'tone', binauralModulation: true });
+  const oscillators = AudioContextMock.latest.nodes.filter(n => n.kind === 'oscillator');
+  assert.equal(oscillators.length, 1);
+  assert.equal(oscillators[0].frequency.value, 528);
+  assert.deepEqual(oscillators[0].connections.map(c => c.input), [0, 1]);
+  assert.equal(engine.getStereoSnapshot(), null); // Native analysers are optional in the mock.
+  await engine.pause();
+  await engine.stop();
 });
 
 test('binaural engine routes isolated sine oscillators to the two stereo inputs', async () => {

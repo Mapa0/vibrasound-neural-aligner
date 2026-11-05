@@ -10,15 +10,112 @@ export function waveAt(frequency, timeSeconds, distance = 0, speed = 1, phase = 
   return Math.cos(TAU * frequency * (timeSeconds - distance / speed) + phase);
 }
 
+/** Event count is derived from audio seconds, never accumulated by timers. */
+export function meteorEventIndex(frequency, elapsedSeconds) {
+  return Math.floor(Math.max(0, elapsedSeconds) * frequency);
+}
+
+export function meteorBirthTime(frequency, eventIndex) {
+  return eventIndex / frequency;
+}
+
+/** Full-strength strobe reaches the chosen intensity at each cosine crest. */
+export function strobeOpacityAt(frequency, timeSeconds, intensity = 1) {
+  return Math.max(0, Math.min(1, intensity)) * (0.5 + 0.5 * Math.cos(TAU * frequency * timeSeconds));
+}
+
+function meteorRandom(index, salt) {
+  let n = Math.imul(index, 1664525) + Math.imul(salt, 1013904223);
+  n ^= n >>> 16;
+  n = Math.imul(n, 0x7feb352d);
+  n ^= n >>> 15;
+  n = Math.imul(n, 0x846ca68b);
+  n ^= n >>> 16;
+  return (n >>> 0) / 4294967296;
+}
+
+/** Copy an actual PCM window with a rising-zero trigger and no normalization.
+ * Both channels use the same duration; display spacing therefore retains
+ * their different frequencies. The output buffer is owned and reused by UI.
+ */
+export function writeWaveform(samples, sampleRate, frequency, output, windowSeconds = 0.016) {
+  if (!samples || samples.length < 2 || !output.length) {
+    output.fill(0);
+    return 0;
+  }
+  const span = Math.min(sampleRate * windowSeconds, samples.length - 2);
+  const maximumStart = Math.max(0, Math.min(samples.length - span - 2, sampleRate / Math.max(1, frequency) * 2));
+  let start = 0;
+  for (let i = 0; i < maximumStart; i++) {
+    if (samples[i] < 0 && samples[i + 1] >= 0) {
+      start = i - samples[i] / (samples[i + 1] - samples[i]);
+      break;
+    }
+  }
+  for (let i = 0; i < output.length; i++) {
+    const position = start + span * i / Math.max(1, output.length - 1);
+    const index = Math.min(samples.length - 2, Math.floor(position));
+    const fraction = position - index;
+    output[i] = samples[index] * (1 - fraction) + samples[index + 1] * fraction;
+  }
+  return start;
+}
+
+/** Fixed-reference signal features; this never normalizes either channel. */
+export function channelSignalFeatures(samples, sampleRate, frequency, output = {}) {
+  let squares = 0, differences = 0, peak = 0;
+  for (let i = 0; i < samples.length; i++) {
+    const value = samples[i];
+    squares += value * value;
+    peak = Math.max(peak, Math.abs(value));
+    if (i) differences += (value - samples[i - 1]) ** 2;
+  }
+  const rms = samples.length ? Math.sqrt(squares / samples.length) : 0;
+  const roughness = rms > 1e-8 ? Math.sqrt(differences / Math.max(1, samples.length - 1)) / rms : 0;
+  const sineRoughness = 2 * Math.sin(Math.PI * frequency / sampleRate);
+  const spectralShape = rms > 1e-8 && sineRoughness > 0 ? Math.max(0, roughness / sineRoughness - 1) : 0;
+  const crestShape = rms > 1e-8 ? Math.max(0, peak / (rms * Math.SQRT2) - 1) : 0;
+  output.rms = rms;
+  output.texture = Math.min(0.65, spectralShape * 0.5 + crestShape * 0.2);
+  return output;
+}
+
+/** Audio-clock low-pass filter. A held clock holds the visual state, and a
+ * new session resets it. Exact PCM silence can bypass the filter for mute.
+ */
+export function updateWaveLevel(state, input, elapsedSeconds, tau = 0.75, hardZero = true) {
+  if (state.elapsed == null || elapsedSeconds < state.elapsed || (hardZero && input === 0)) {
+    state.value = input;
+    state.elapsed = elapsedSeconds;
+    return input;
+  }
+  const dt = Math.max(0, elapsedSeconds - state.elapsed);
+  if (dt > 0) {
+    const alpha = -Math.expm1(-dt / Math.max(0.001, tau));
+    state.value += (input - state.value) * alpha;
+    state.elapsed = elapsedSeconds;
+  }
+  return state.value;
+}
+
 const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
 
 export class CosmicVisualizer {
-  constructor(canvas, { getTime, getConfig, getActive }) {
+  constructor(canvas, { getTime, getConfig, getActive, getAudioData = () => null }) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d', { alpha: false });
     this.getTime = getTime;
     this.getConfig = getConfig;
     this.getActive = getActive;
+    this.getAudioData = getAudioData;
+    this.leftWave = new Float32Array(640);
+    this.rightWave = new Float32Array(640);
+    this.leftSignal = {};
+    this.rightSignal = {};
+    this.leftLevelFilter = { value: 0, elapsed: null };
+    this.rightLevelFilter = { value: 0, elapsed: null };
+    this.leftTextureFilter = { value: 0, elapsed: null };
+    this.rightTextureFilter = { value: 0, elapsed: null };
     this.frame = 0;
     this.running = false;
     this.frameAverage = 16.67;
@@ -132,17 +229,23 @@ export class CosmicVisualizer {
       background.height = this.canvas.height;
       const b = background.getContext('2d', { alpha: false });
       b.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-      b.fillStyle = '#07090d';
+      b.fillStyle = effect === 'stars' ? '#000000' : '#07090d';
       b.fillRect(0, 0, w, h);
       this.ctx = b;
-      this.glow(cx + radius * 0.5, cy - radius * 0.12, radius * 2.4, 0.037);
-      this.glow(cx - radius * 0.64, cy + radius * 0.64, radius * 1.65, 0.026, '71,112,137');
+      if (effect !== 'stars') {
+        this.glow(cx + radius * 0.5, cy - radius * 0.12, radius * 2.4, 0.037);
+        this.glow(cx - radius * 0.64, cy + radius * 0.64, radius * 1.65, 0.026, '71,112,137');
+      }
       b.globalCompositeOperation = 'screen';
       if (effect === 'liquid') {
         this.glow(cx, cy, radius * 1.65, 0.048);
         this.glow(cx - radius * 0.52, cy - radius * 0.08, radius * 0.8, 0.045);
         this.glow(cx + radius * 0.62, cy + radius * 0.16, radius * 0.9, 0.032);
-      } else {
+      } else if (effect === 'stereo') {
+        this.glow(cx - radius * 1.08, cy, radius * 0.95, 0.115);
+        this.glow(cx + radius * 1.08, cy, radius * 0.95, 0.115);
+        this.glow(cx, cy, radius * 1.7, 0.025);
+      } else if (effect !== 'stars') {
         this.glow(cx, cy, radius * 1.1, 0.096);
         this.glow(cx - radius * 0.5, cy - radius * 0.44, radius * 0.7, 0.111);
         this.glow(cx + radius * 0.48, cy + radius * 0.36, radius * 0.7, 0.093);
@@ -153,7 +256,7 @@ export class CosmicVisualizer {
     }
     c.drawImage(this.background, 0, 0, w, h);
     c.globalCompositeOperation = 'screen';
-    const drift = this.reduceMotion ? 0 : t;
+    const drift = this.reduceMotion || effect === 'stars' ? 0 : t;
     for (let i = 0; i < 220; i++) {
       const p = i * 5;
       const x = (this.stars[p] * w + drift * (0.12 + this.stars[p + 2] * 0.5)) % w;
@@ -204,20 +307,22 @@ export class CosmicVisualizer {
     c.restore();
   }
 
-  makeWater(frequency, speed, spread) {
+  makeWater(frequency, speed, spread, { leftRatio = 1, rightRatio = 1, separation = 0.5 } = {}) {
     const quality = this.waterQuality ?? 1;
     const columns = Math.round((this.mobile ? 92 : 128) * quality);
     const rows = Math.round((this.mobile ? 42 : 56) * quality);
     const count = columns * rows;
+    const sourceDistance = 0.35 + separation * 0.6;
     const sources = [
-      [-0.58 - spread * 0.1, -0.15, 0, 1],
-      [0.58 + spread * 0.1, 0.20, 0.43 * TAU, 0.68],
-      [0.08, -0.60, 0.77 * TAU, 0.42],
+      [-sourceDistance, -0.12, 0, 1, leftRatio],
+      [sourceDistance, 0.16, 0.43 * TAU, 1, rightRatio],
     ];
     const water = {
-      columns, rows, sources, frequency, speed, spread,
+      columns, rows, sources, frequency, speed, spread, leftRatio, rightRatio, separation,
       xs: new Float32Array(count), zs: new Float32Array(count),
       cos: new Float32Array(count), sin: new Float32Array(count),
+      leftCos: new Float32Array(count), leftSin: new Float32Array(count),
+      rightCos: new Float32Array(count), rightSin: new Float32Array(count),
       fade: new Float32Array(count), px: new Float32Array(count),
       py: new Float32Array(count), heights: new Float32Array(count),
       flowCos: new Float32Array(count), flowSin: new Float32Array(count),
@@ -233,12 +338,18 @@ export class CosmicVisualizer {
         const edge = Math.pow(Math.max(0, 1 - Math.pow(Math.abs(x) / 1.72, 6)), 0.5)
           * Math.pow(Math.max(0, 1 - Math.pow(Math.abs(z) / 1.12, 6)), 0.6);
         water.fade[p] = edge;
-        for (const source of sources) {
+        for (let channel = 0; channel < sources.length; channel++) {
+          const source = sources[channel];
           const d = Math.hypot(x - source[0], z - source[1]);
           const a = Math.exp(-d * damping) * source[3] / Math.sqrt(1 + d * 2);
-          const phase = TAU * frequency * d / speed - source[2];
-          water.cos[p] += Math.cos(phase) * a;
-          water.sin[p] += Math.sin(phase) * a;
+          // Audible carrier ratios change spatial wavelength, never the
+          // display's temporal refresh or its shared visual rhythm.
+          const phase = TAU * frequency * d * source[4] / speed - source[2];
+          const cosine = Math.cos(phase) * a, sine = Math.sin(phase) * a;
+          water.cos[p] += cosine;
+          water.sin[p] += sine;
+          if (channel === 0) { water.leftCos[p] = cosine; water.leftSin[p] = sine; }
+          else { water.rightCos[p] = cosine; water.rightSin[p] = sine; }
         }
         water.flowCos[p] = Math.cos(x * 2.4 + z * 3.6);
         water.flowSin[p] = Math.sin(x * 2.4 + z * 3.6);
@@ -248,14 +359,47 @@ export class CosmicVisualizer {
     return water;
   }
 
-  drawLiquid(t, cx, cy, radius, target, pulsing, intensity, motionSpeed, spread) {
+  drawLiquid(t, cx, cy, radius, target, pulsing, intensity, motionSpeed, spread, config = {}) {
     // Only the propagation speed changes with motionSpeed. The source keeps
     // emitting exactly target cycles per audio second after explicit opt-in.
     const frequency = pulsing ? target : 0.34;
     const speed = pulsing ? (1.4 + frequency * 0.2) * motionSpeed : 0.135 * motionSpeed;
+    const snapshot = this.getAudioData();
+    const measured = !!(snapshot?.left?.length && snapshot?.right?.length && snapshot.sampleRate > 0);
+    const carrier = Number(config.carrier) || 528;
+    const binaural = config.audioMode === 'binaural';
+    const leftHz = measured ? snapshot.leftHz : binaural ? carrier - target / 2 : carrier;
+    const rightHz = measured ? snapshot.rightHz : binaural ? carrier + target / 2 : carrier;
+    const referenceHz = (leftHz + rightHz) / 2;
+    const leftRatio = leftHz / referenceHz, rightRatio = rightHz / referenceHz;
+    const separation = clamp(Number(config.liquidSeparation ?? 0.5), 0, 1);
+    const leftGain = clamp(Number(config.liquidLeftGain ?? 1), 0, 1.5);
+    const rightGain = clamp(Number(config.liquidRightGain ?? 1), 0, 1.5);
+    let leftLevel, rightLevel, leftTexture = 0, rightTexture = 0;
+    if (measured) {
+      channelSignalFeatures(snapshot.left, snapshot.sampleRate, leftHz, this.leftSignal);
+      channelSignalFeatures(snapshot.right, snapshot.sampleRate, rightHz, this.rightSignal);
+      // .0282843 is the RMS of the app's .04-peak pure sine at 25% volume.
+      const referenceRms = Math.SQRT1_2 * 0.04;
+      const signalTime = Number.isFinite(snapshot.elapsed) ? snapshot.elapsed : t;
+      // Continuous mode deliberately averages rapid AM envelopes rather than
+      // carrying an audio-rate pulse into the surface without visual opt-in.
+      const tau = pulsing ? 0.05 : 0.75;
+      const leftRms = updateWaveLevel(this.leftLevelFilter, this.leftSignal.rms, signalTime, tau);
+      const rightRms = updateWaveLevel(this.rightLevelFilter, this.rightSignal.rms, signalTime, tau);
+      leftLevel = Math.min(3, leftRms / referenceRms) * leftGain;
+      rightLevel = Math.min(3, rightRms / referenceRms) * rightGain;
+      leftTexture = updateWaveLevel(this.leftTextureFilter, this.leftSignal.texture, signalTime, tau, false);
+      rightTexture = updateWaveLevel(this.rightTextureFilter, this.rightSignal.texture, signalTime, tau, false);
+    } else {
+      const previewLevel = clamp(Number(config.volume ?? 0.25), 0, 1) / 0.25;
+      leftLevel = Math.min(3, previewLevel) * leftGain;
+      rightLevel = Math.min(3, previewLevel) * rightGain;
+    }
     let water = this.water;
-    if (!water || water.frequency !== frequency || water.speed !== speed || water.spread !== spread) {
-      water = this.makeWater(frequency, speed, spread);
+    if (!water || water.frequency !== frequency || water.speed !== speed || water.spread !== spread
+      || water.leftRatio !== leftRatio || water.rightRatio !== rightRatio || water.separation !== separation) {
+      water = this.makeWater(frequency, speed, spread, { leftRatio, rightRatio, separation });
     }
     const c = this.ctx;
     const phase = this.reduceMotion ? 0 : TAU * frequency * t;
@@ -265,9 +409,12 @@ export class CosmicVisualizer {
     const amplitude = 0.11 + intensity * 0.1;
     const { columns, rows, xs, zs, px, py, heights, fade } = water;
     for (let p = 0; p < xs.length; p++) {
-      const wave = water.cos[p] * cosT + water.sin[p] * sinT;
+      const leftWave = water.leftCos[p] * cosT + water.leftSin[p] * sinT;
+      const rightWave = water.rightCos[p] * cosT + water.rightSin[p] * sinT;
+      const wave = leftWave * (1 + leftTexture * Math.abs(leftWave) * 0.35) * leftLevel
+        + rightWave * (1 + rightTexture * Math.abs(rightWave) * 0.35) * rightLevel;
       const flowHeight = (water.flowCos[p] * flowCos + water.flowSin[p] * flowSin) * 0.024;
-      const h = wave * amplitude + flowHeight;
+      const h = clamp(wave * amplitude, -0.55, 0.55) + flowHeight;
       const perspective = 1 + zs[p] * 0.19;
       px[p] = cx + (xs[p] + flowHeight * 0.24) * radius * perspective;
       py[p] = cy + zs[p] * radius * 0.60 * perspective - h * radius;
@@ -312,16 +459,18 @@ export class CosmicVisualizer {
     c.stroke();
 
     // Outward-traveling crest rings show each emitter's wave propagation.
-    const wavelength = speed / frequency;
     const maxDistance = 1.25 + spread * 0.75;
     for (let sourceIndex = 0; sourceIndex < water.sources.length; sourceIndex++) {
       const source = water.sources[sourceIndex];
+      const level = sourceIndex === 0 ? leftLevel : rightLevel;
+      if (level < 0.001) continue;
+      const wavelength = speed / (frequency * source[4]);
       const progress = ((phase + source[2]) / TAU % 1 + 1) % 1;
       const ringCount = Math.min(22, Math.ceil(maxDistance / wavelength));
       for (let ring = 0; ring < ringCount; ring++) {
         const distance = (ring + progress) * wavelength;
         if (distance < 0.04 || distance > maxDistance) continue;
-        const ringFade = Math.pow(1 - distance / maxDistance, 1.8) * source[3];
+        const ringFade = Math.pow(1 - distance / maxDistance, 1.8) * source[3] * Math.min(1.5, level);
         c.beginPath();
         let drawing = false;
         for (let step = 0; step <= 96; step++) {
@@ -331,7 +480,7 @@ export class CosmicVisualizer {
           if (Math.abs(x) > 1.62 || Math.abs(z) > 1.03) { drawing = false; continue; }
           const perspective = 1 + z * 0.19;
           const sx = cx + x * radius * perspective;
-          const sy = cy + z * radius * 0.6 * perspective - amplitude * source[3] * Math.exp(-distance * 0.8) * radius * 0.55;
+          const sy = cy + z * radius * 0.6 * perspective - amplitude * source[3] * Math.exp(-distance * 0.8) * radius * 0.55 * Math.min(2, level);
           if (drawing) c.lineTo(sx, sy); else c.moveTo(sx, sy);
           drawing = true;
         }
@@ -346,6 +495,164 @@ export class CosmicVisualizer {
       if (brightness < 0.025) continue;
       c.globalAlpha = brightness;
       c.drawImage(this.sprite, px[p] - 3, py[p] - 3, 6, 6);
+    }
+    c.globalAlpha = 1;
+  }
+
+  drawShootingStars(t, target, active, intensity, motionSpeed) {
+    if (this.reduceMotion) return;
+    const c = this.ctx;
+    // This is an arrival rate, not a flashing brightness wave. During a
+    // session it follows target even when pulsing light is disabled or the
+    // arrival rate exceeds half the display refresh rate.
+    const frequency = active ? target : 0.7;
+    const lifetime = 2.15;
+    const last = meteorEventIndex(frequency, t);
+    const first = Math.max(1, meteorEventIndex(frequency, Math.max(0, t - lifetime)) + 1);
+    const dimension = Math.min(this.width, this.height);
+    c.globalCompositeOperation = 'source-over';
+    c.lineCap = 'round';
+    for (let index = first; index <= last; index++) {
+      const age = t - meteorBirthTime(frequency, index);
+      if (age < 0 || age >= lifetime) continue;
+      const angle = 0.63 + meteorRandom(index, 1) * 0.3;
+      const cos = Math.cos(angle), sin = Math.sin(angle);
+      const velocity = dimension * (0.26 + meteorRandom(index, 2) * 0.15) * motionSpeed;
+      const x = this.width * (0.04 + meteorRandom(index, 3) * 0.74) + cos * velocity * age;
+      const y = this.height * (0.04 + meteorRandom(index, 4) * 0.58) + sin * velocity * age;
+      const tailLength = Math.min(velocity * age, dimension * (0.08 + meteorRandom(index, 5) * 0.10));
+      const tailX = x - cos * tailLength, tailY = y - sin * tailLength;
+      const envelope = Math.pow(Math.sin(Math.PI * age / lifetime), 0.7);
+      const brightness = envelope * (0.2 + intensity * 0.8);
+      const gradient = c.createLinearGradient(tailX, tailY, x, y);
+      gradient.addColorStop(0, `rgba(${this.rgb},0)`);
+      gradient.addColorStop(0.6, `rgba(${this.rgb},.34)`);
+      gradient.addColorStop(1, `rgba(${this.pale},.96)`);
+      c.globalAlpha = brightness;
+      c.strokeStyle = gradient;
+      c.lineWidth = 0.65 + meteorRandom(index, 6) * 0.8;
+      c.beginPath();
+      c.moveTo(tailX, tailY);
+      c.lineTo(x, y);
+      c.stroke();
+      const glowSize = 9 + meteorRandom(index, 7) * 7;
+      c.drawImage(this.sprite, x - glowSize / 2, y - glowSize / 2, glowSize, glowSize);
+      c.fillStyle = '#f5fff8';
+      c.fillRect(x - 0.6, y - 0.6, 1.2, 1.2);
+    }
+    c.lineCap = 'butt';
+    c.globalAlpha = 1;
+  }
+
+  drawStereo(t, cx, cy, radius, config, motionSpeed) {
+    const snapshot = this.getAudioData();
+    const measured = !!(snapshot?.left?.length && snapshot?.right?.length && snapshot.sampleRate > 0);
+    const carrier = Number(config.carrier) || 528;
+    const target = Number(config.target) || 6;
+    const binaural = config.audioMode === 'binaural';
+    const leftHz = measured ? snapshot.leftHz : binaural ? carrier - target / 2 : carrier;
+    const rightHz = measured ? snapshot.rightHz : binaural ? carrier + target / 2 : carrier;
+    const windowSeconds = clamp(8 / ((leftHz + rightHz) / 2), 0.008, 0.02);
+    if (measured) {
+      writeWaveform(snapshot.left, snapshot.sampleRate, leftHz, this.leftWave, windowSeconds);
+      writeWaveform(snapshot.right, snapshot.sampleRate, rightHz, this.rightWave, windowSeconds);
+    } else {
+      // Idle preview is mathematical, never presented as measured output.
+      const amplitude = clamp(Number(config.volume ?? 0.25), 0, 1) * 0.16;
+      for (let i = 0; i < this.leftWave.length; i++) {
+        const seconds = i / (this.leftWave.length - 1) * windowSeconds;
+        this.leftWave[i] = Math.sin(TAU * leftHz * seconds) * amplitude;
+        this.rightWave[i] = Math.sin(TAU * rightHz * seconds) * amplitude;
+      }
+    }
+    const halfSeparation = Math.min(this.width * 0.22, radius * 1.08);
+    const ribbonWidth = Math.min(this.width * 0.39, radius * 1.75);
+    this.drawChannelRibbon(this.leftWave, cx - halfSeparation, cy, ribbonWidth, radius, t, motionSpeed, 0);
+    this.drawChannelRibbon(this.rightWave, cx + halfSeparation, cy, ribbonWidth, radius, t, motionSpeed, 1);
+    const c = this.ctx;
+    const labelY = cy + radius * 0.38;
+    c.globalCompositeOperation = 'source-over';
+    c.textAlign = 'center';
+    c.font = `${this.mobile ? 9 : 10}px ui-monospace, SFMono-Regular, Consolas, monospace`;
+    c.fillStyle = `rgba(${this.pale},.54)`;
+    const formatHz = f => Number(f.toFixed(2));
+    c.fillText(`LEFT  ·  ${formatHz(leftHz)} Hz`, cx - halfSeparation, labelY);
+    c.fillText(`RIGHT  ·  ${formatHz(rightHz)} Hz`, cx + halfSeparation, labelY);
+    if (!measured) {
+      c.font = '8px ui-monospace, SFMono-Regular, Consolas, monospace';
+      c.fillStyle = `rgba(${this.pale},.28)`;
+      c.fillText('PREVIEW', cx, labelY + 33);
+    }
+  }
+
+  drawChannelRibbon(data, centerX, centerY, width, radius, t, motionSpeed, channel) {
+    const c = this.ctx;
+    const startX = centerX - width / 2;
+    // Fixed visual gain: quieter output and AM troughs really are smaller.
+    // No per-frame peak normalization can conceal silence or modulation.
+    const sampleScale = radius * 4.2;
+    let energy = 0;
+    for (let i = 0; i < data.length; i++) energy += data[i] * data[i];
+    const echoGain = Math.min(1, Math.sqrt(energy / data.length) * 20);
+    c.globalCompositeOperation = 'source-over';
+    c.beginPath();
+    c.moveTo(startX, centerY);
+    c.lineTo(startX + width, centerY);
+    c.lineWidth = 0.45;
+    c.strokeStyle = `rgba(${this.rgb},.08)`;
+    c.stroke();
+
+    // Translucent neighboring ribbons all retain the sampled channel shape.
+    for (let echo = -3; echo <= 3; echo++) {
+      if (echo === 0) continue;
+      const echoScale = 1 - Math.abs(echo) * 0.12;
+      c.beginPath();
+      for (let i = 0; i < data.length; i++) {
+        const u = i / (data.length - 1);
+        const taper = Math.pow(Math.sin(Math.PI * u), 0.45);
+        const x = startX + u * width;
+        const y = centerY - data[i] * sampleScale * taper * echoScale + echo * radius * 0.019 * taper * echoGain;
+        if (!i) c.moveTo(x, y); else c.lineTo(x, y);
+      }
+      c.strokeStyle = `rgba(${this.rgb},${0.075 / Math.abs(echo)})`;
+      c.lineWidth = 0.65;
+      c.stroke();
+    }
+    c.beginPath();
+    for (let i = 0; i < data.length; i++) {
+      const u = i / (data.length - 1);
+      const taper = Math.pow(Math.sin(Math.PI * u), 0.45);
+      const x = startX + u * width;
+      const y = centerY - data[i] * sampleScale * taper;
+      if (!i) c.moveTo(x, y); else c.lineTo(x, y);
+    }
+    c.lineWidth = 11;
+    c.strokeStyle = `rgba(${this.rgb},.035)`;
+    c.stroke();
+    c.lineWidth = 4;
+    c.strokeStyle = `rgba(${this.rgb},.12)`;
+    c.stroke();
+    c.lineWidth = 1.1;
+    c.strokeStyle = `rgba(${this.rgb},.78)`;
+    c.stroke();
+    c.lineWidth = 0.5;
+    c.strokeStyle = `rgba(${this.pale},.88)`;
+    c.stroke();
+    // Fill the actual waveform back to its baseline, like light in water.
+    c.lineTo(startX + width, centerY);
+    c.lineTo(startX, centerY);
+    c.closePath();
+    c.fillStyle = `rgba(${this.rgb},.028)`;
+    c.fill();
+
+    for (let point = 0; point < 9; point++) {
+      const u = (point / 9 + t * motionSpeed * 0.036 + channel * 0.045) % 1;
+      const sample = data[Math.floor(u * (data.length - 1))];
+      const taper = Math.pow(Math.sin(Math.PI * u), 0.45);
+      const x = startX + u * width;
+      const y = centerY - sample * sampleScale * taper;
+      c.globalAlpha = taper * clamp(Math.abs(sample) * 10, 0, 0.8);
+      c.drawImage(this.sprite, x - 4, y - 4, 8, 8);
     }
     c.globalAlpha = 1;
   }
@@ -366,7 +673,6 @@ export class CosmicVisualizer {
     const spread = clamp(Number(config.rippleSpread ?? 0.5), 0, 1);
     // A display cannot represent a rhythm at or above half its frame rate.
     const pulsing = active && config.pulseEnabled === true && frequency < this.frameRate / 2 && !this.reduceMotion;
-    const envelope = pulsing ? opacityAt(frequency, t) : 0.5;
     const phase = pulsing ? TAU * frequency * t : 0;
     const cx = this.width * 0.5;
     const cy = immersive ? this.height * 0.49 : this.mobile ? this.height * 0.28 : Math.min(this.height * 0.33, 330);
@@ -377,8 +683,18 @@ export class CosmicVisualizer {
     this.drawBackground(motion, cx, cy, radius, config.effect);
 
     c.globalCompositeOperation = 'screen';
+    if (config.effect === 'stereo') {
+      this.drawStereo(motion, cx, cy, radius, config, motionSpeed);
+      this.finishFrame(now);
+      return;
+    }
+    if (config.effect === 'stars') {
+      this.drawShootingStars(t, frequency, active, intensity, motionSpeed);
+      this.finishFrame(now);
+      return;
+    }
     if (config.effect === 'liquid') {
-      this.drawLiquid(t, cx, cy, radius, frequency, pulsing, intensity, motionSpeed, spread);
+      this.drawLiquid(t, cx, cy, radius, frequency, pulsing, intensity, motionSpeed, spread, config);
       this.finishFrame(now);
       return;
     }
@@ -442,15 +758,12 @@ export class CosmicVisualizer {
     }
 
     if (config.effect === 'strobe' && pulsing) {
-      // A soft-edged local color layer uses the exact 20–80% envelope.
-      // The independently selected intensity limits its luminous amplitude.
-      const mask = c.createRadialGradient(cx, cy, radius * 0.1, cx, cy, radius * 1.75);
-      mask.addColorStop(0, `rgba(${this.rgb},.28)`);
-      mask.addColorStop(0.5, `rgba(${this.rgb},.11)`);
-      mask.addColorStop(1, `rgba(${this.rgb},0)`);
-      c.globalAlpha = envelope * intensity;
-      c.fillStyle = mask;
-      c.fillRect(cx - radius * 1.75, cy - radius * 1.75, radius * 3.5, radius * 3.5);
+      // Explicit full-strength mode: 100% intensity can cover the whole
+      // viewport with the selected color. Audio seconds define its phase.
+      c.globalCompositeOperation = 'source-over';
+      c.globalAlpha = strobeOpacityAt(frequency, t, intensity);
+      c.fillStyle = `rgb(${this.rgb})`;
+      c.fillRect(0, 0, this.width, this.height);
       c.globalAlpha = 1;
     }
     this.finishFrame(now);

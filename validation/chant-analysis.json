@@ -1,0 +1,402 @@
+{
+  "method": "DC removal and autocorrelation F0 on 128 ms frames. Six sustained voices select a stable voiced region, discard silence/unvoiced material, and measure 16 harmonic envelopes for an 8-second circular morph. VAM preserves the complete 15.46-second phrase through 64 spectral/level frames, weak measured onset frication, tapered ends and a 350 ms gap. Runtime hybrid absolute-Hz formant envelope (72%) and relative recorded harmonic profile (28%), with a fundamental floor, are resynthesized at the exact requested fundamental in an AudioWorklet. Each output table targets RMS 0.30 with a 0.70 peak cap before the phrase envelope and app volume/fade.",
+  "sourcePolicy": "Original WAV recordings are read only. Published JSON models contain derived spectral data. Separate processed natural-pitch PCM assets contain trimmed/normalized recordings; originals are not published.",
+  "naturalMethod": "Actual recorded PCM, with no pitch shifting: DC removal, gentle soft peak limiting and RMS normalization. Six sustained excerpts use an 80 ms circular crossfade. VAM keeps the entire recorded phrase, with tapered ends and a 350 ms silent gap. AudioBufferSource playback duplicates the same voice into both channels and applies native target-rate cosine amplitude modulation.",
+  "precision": "Source pitch quantiles describe estimated recording pitch. Tuned playback resynthesizes a selected fundamental, retaining a hybrid formant/harmonic envelope. Natural playback does not shift pitch: it plays actual processed recordings, and its displayed pitch contour is an estimate rather than an exact oscillator frequency.",
+  "caveats": [
+    "Tuned resynthesis approximates vocal timbre rather than reproducing the unchanged recording.",
+    "Tuned VAM preserves the V-to-A-to-M spectral time course with approximated weak onset noise; natural VAM plays the actual recorded consonant and phrase after level/edge processing.",
+    "At high tuned fundamentals (especially near 1500 Hz), sparse harmonics make vowels and articulation less recognizable.",
+    "A harmonic voice has multiple spectral components; in tuned mode the requested frequency is its voiced fundamental, not its only frequency."
+  ],
+  "recordings": [
+    {
+      "chant": "MMM",
+      "sourceFile": "MMM.wav",
+      "sourceSHA256": "375e8d0e057fc68c455328b33bb9308121bbe97dce55ed347fe16b3c8aa3bb44",
+      "sampleRate": 48000,
+      "durationSeconds": 16.97,
+      "voicedF0Hz": {
+        "p05": 87.4467,
+        "median": 88.9426,
+        "p95": 91.1429
+      },
+      "selectedF0Hz": {
+        "p05": 88.2526,
+        "median": 89.2428,
+        "p95": 91.2553
+      },
+      "sourcePitchVariationPercent": 0.976,
+      "sourceTrimSeconds": [
+        6.875,
+        9.753
+      ],
+      "medianHarmonicToFundamentalEnergy": 0.3258,
+      "sourcePeak": 0.03845,
+      "model": "chants/MMM.json",
+      "spectralFrames": 16,
+      "processing": [
+        "DC removed before analysis",
+        "Silence and low-periodicity frames excluded",
+        "Stable voiced segment selected",
+        "Spectral-only model discards background/unvoiced noise",
+        "Runtime output RMS-normalized with peak cap",
+        "Continuous circular crossfade, no raw recording loop"
+      ],
+      "kind": "sustained",
+      "naturalRecording": {
+        "asset": "chants/MMM-natural.wav",
+        "durationSeconds": 2.798,
+        "sourceTrimSeconds": [
+          6.875,
+          9.753
+        ],
+        "rms": 0.279334,
+        "peak": 0.669952,
+        "dcMean": 3e-08,
+        "loopBoundaryAdjacentSampleDelta": 0.006805,
+        "loopCrossfadeSeconds": 0.08,
+        "processing": "Actual recorded PCM, no pitch shift; DC removal, gentle soft limiting, 20 Hz rumble/DC high-pass, RMS normalization, and loop/phrase edge treatment.",
+        "noiseCaveat": "No reference noise-only recording exists, so no objective SNR improvement is claimed."
+      },
+      "octaveAudit": {
+        "selectedF0Hz": 89.2428,
+        "oddHalfFrequencyBandsToSelectedHarmonicsPowerRatio": 0.00080179,
+        "interpretation": "Small odd-half-frequency energy supports the selected fundamental rather than an octave-lower fundamental; this remains an estimate, not a ground-truth laryngeal measurement."
+      }
+    },
+    {
+      "chant": "VAM",
+      "sourceFile": "VAM.wav",
+      "sourceSHA256": "7fc9c44110d16db5c3cc47db666edd4adcedd2bec29861577f838ff401d23e88",
+      "sampleRate": 48000,
+      "durationSeconds": 15.46,
+      "voicedF0Hz": {
+        "p05": 86.3657,
+        "median": 87.9065,
+        "p95": 89.1381
+      },
+      "selectedF0Hz": {
+        "p05": 86.3657,
+        "median": 87.9065,
+        "p95": 89.1381
+      },
+      "sourcePitchVariationPercent": 1.008,
+      "sourceTrimSeconds": [
+        0,
+        15.46
+      ],
+      "medianHarmonicToFundamentalEnergy": 1.1601,
+      "sourcePeak": 0.06125,
+      "model": "chants/VAM.json",
+      "spectralFrames": 64,
+      "processing": [
+        "DC removed before analysis",
+        "Runtime output RMS-normalized with peak cap",
+        "Continuous circular crossfade, no raw recording loop",
+        "Full VAM phrase time course preserved",
+        "Measured amplitude envelope retained after global normalization",
+        "120 ms onset and 250 ms release with 350 ms gap"
+      ],
+      "kind": "articulated-phrase",
+      "naturalRecording": {
+        "asset": "chants/VAM-natural.wav",
+        "durationSeconds": 15.81,
+        "sourceTrimSeconds": [
+          0.0,
+          15.46
+        ],
+        "rms": 0.225218,
+        "peak": 0.699982,
+        "dcMean": 0.0,
+        "loopBoundaryAdjacentSampleDelta": 0.0,
+        "loopCrossfadeSeconds": 0,
+        "processing": "Actual recorded PCM, no pitch shift; DC removal, gentle soft limiting, 20 Hz rumble/DC high-pass, RMS normalization, and loop/phrase edge treatment.",
+        "noiseCaveat": "No reference noise-only recording exists, so no objective SNR improvement is claimed."
+      },
+      "phraseDurationSeconds": 15.46,
+      "loopGapSeconds": 0.35,
+      "articulation": "Preserves the full recorded time course: soft V onset, open A through roughly 5.4 seconds, then M closure to the end. Measured level envelope and spectral shape evolve across 64 frames. Weak onset frication is resynthesized as shaped noise; this is not raw speech playback.",
+      "octaveAudit": {
+        "selectedF0Hz": 87.4953,
+        "oddHalfFrequencyBandsToSelectedHarmonicsPowerRatio": 0.00022504,
+        "interpretation": "Small odd-half-frequency energy supports the selected fundamental rather than an octave-lower fundamental; this remains an estimate, not a ground-truth laryngeal measurement."
+      }
+    },
+    {
+      "chant": "III",
+      "sourceFile": "III.wav",
+      "sourceSHA256": "ce83d0c56912fb5246ce289644e1b0b7a395bba4033faf1ec5ae890e511c75e9",
+      "sampleRate": 48000,
+      "durationSeconds": 15.38,
+      "voicedF0Hz": {
+        "p05": 84.5159,
+        "median": 166.6571,
+        "p95": 175.0156
+      },
+      "selectedF0Hz": {
+        "p05": 166.5115,
+        "median": 166.6663,
+        "p95": 166.739
+      },
+      "sourcePitchVariationPercent": 0.04,
+      "sourceTrimSeconds": [
+        1.45,
+        4.353
+      ],
+      "medianHarmonicToFundamentalEnergy": 0.3825,
+      "sourcePeak": 0.07236,
+      "model": "chants/III.json",
+      "spectralFrames": 16,
+      "processing": [
+        "DC removed before analysis",
+        "Silence and low-periodicity frames excluded",
+        "Stable voiced segment selected",
+        "Spectral-only model discards background/unvoiced noise",
+        "Runtime output RMS-normalized with peak cap",
+        "Continuous circular crossfade, no raw recording loop"
+      ],
+      "kind": "sustained",
+      "naturalRecording": {
+        "asset": "chants/III-natural.wav",
+        "durationSeconds": 2.823,
+        "sourceTrimSeconds": [
+          1.45,
+          4.353
+        ],
+        "rms": 0.278783,
+        "peak": 0.59137,
+        "dcMean": -1e-08,
+        "loopBoundaryAdjacentSampleDelta": 0.032043,
+        "loopCrossfadeSeconds": 0.08,
+        "processing": "Actual recorded PCM, no pitch shift; DC removal, gentle soft limiting, 20 Hz rumble/DC high-pass, RMS normalization, and loop/phrase edge treatment.",
+        "noiseCaveat": "No reference noise-only recording exists, so no objective SNR improvement is claimed."
+      },
+      "octaveAudit": {
+        "selectedF0Hz": 166.6663,
+        "oddHalfFrequencyBandsToSelectedHarmonicsPowerRatio": 6.33e-06,
+        "interpretation": "Small odd-half-frequency energy supports the selected fundamental rather than an octave-lower fundamental; this remains an estimate, not a ground-truth laryngeal measurement."
+      }
+    },
+    {
+      "chant": "EEE",
+      "sourceFile": "EEE.wav",
+      "sourceSHA256": "0cb5c9170551a87a1ea684aa2b2167fb0bb407c0f42679cffc6796bd71569265",
+      "sampleRate": 48000,
+      "durationSeconds": 15.88,
+      "voicedF0Hz": {
+        "p05": 148.4034,
+        "median": 149.6716,
+        "p95": 150.399
+      },
+      "selectedF0Hz": {
+        "p05": 149.464,
+        "median": 150.1,
+        "p95": 150.514
+      },
+      "sourcePitchVariationPercent": 0.231,
+      "sourceTrimSeconds": [
+        0.725,
+        3.628
+      ],
+      "medianHarmonicToFundamentalEnergy": 14.8654,
+      "sourcePeak": 0.07684,
+      "model": "chants/EEE.json",
+      "spectralFrames": 16,
+      "processing": [
+        "DC removed before analysis",
+        "Silence and low-periodicity frames excluded",
+        "Stable voiced segment selected",
+        "Spectral-only model discards background/unvoiced noise",
+        "Runtime output RMS-normalized with peak cap",
+        "Continuous circular crossfade, no raw recording loop"
+      ],
+      "kind": "sustained",
+      "naturalRecording": {
+        "asset": "chants/EEE-natural.wav",
+        "durationSeconds": 2.8230208333333335,
+        "sourceTrimSeconds": [
+          0.725,
+          3.628
+        ],
+        "rms": 0.280395,
+        "peak": 0.54245,
+        "dcMean": 1e-08,
+        "loopBoundaryAdjacentSampleDelta": 0.011078,
+        "loopCrossfadeSeconds": 0.08,
+        "processing": "Actual recorded PCM, no pitch shift; DC removal, gentle soft limiting, 20 Hz rumble/DC high-pass, RMS normalization, and loop/phrase edge treatment.",
+        "noiseCaveat": "No reference noise-only recording exists, so no objective SNR improvement is claimed."
+      },
+      "octaveAudit": {
+        "selectedF0Hz": 150.1,
+        "oddHalfFrequencyBandsToSelectedHarmonicsPowerRatio": 0.00010626,
+        "interpretation": "Small odd-half-frequency energy supports the selected fundamental rather than an octave-lower fundamental; this remains an estimate, not a ground-truth laryngeal measurement."
+      }
+    },
+    {
+      "chant": "OOO",
+      "sourceFile": "OOO.wav",
+      "sourceSHA256": "5801a66cf9e849dc23175637f7e8033badf0e01690d0180a57a8b3e0d185f8a0",
+      "sampleRate": 48000,
+      "durationSeconds": 15.46,
+      "voicedF0Hz": {
+        "p05": 111.41,
+        "median": 112.7604,
+        "p95": 113.9482
+      },
+      "selectedF0Hz": {
+        "p05": 111.423,
+        "median": 112.3349,
+        "p95": 113.1791
+      },
+      "sourcePitchVariationPercent": 0.477,
+      "sourceTrimSeconds": [
+        1.9,
+        4.803
+      ],
+      "medianHarmonicToFundamentalEnergy": 9.1099,
+      "sourcePeak": 0.10229,
+      "model": "chants/OOO.json",
+      "spectralFrames": 16,
+      "processing": [
+        "DC removed before analysis",
+        "Silence and low-periodicity frames excluded",
+        "Stable voiced segment selected",
+        "Spectral-only model discards background/unvoiced noise",
+        "Runtime output RMS-normalized with peak cap",
+        "Continuous circular crossfade, no raw recording loop"
+      ],
+      "kind": "sustained",
+      "naturalRecording": {
+        "asset": "chants/OOO-natural.wav",
+        "durationSeconds": 2.823,
+        "sourceTrimSeconds": [
+          1.9,
+          4.803
+        ],
+        "rms": 0.279127,
+        "peak": 0.583466,
+        "dcMean": 4e-08,
+        "loopBoundaryAdjacentSampleDelta": 0.003754,
+        "loopCrossfadeSeconds": 0.08,
+        "processing": "Actual recorded PCM, no pitch shift; DC removal, gentle soft limiting, 20 Hz rumble/DC high-pass, RMS normalization, and loop/phrase edge treatment.",
+        "noiseCaveat": "No reference noise-only recording exists, so no objective SNR improvement is claimed."
+      },
+      "octaveAudit": {
+        "selectedF0Hz": 112.3349,
+        "oddHalfFrequencyBandsToSelectedHarmonicsPowerRatio": 2.235e-05,
+        "interpretation": "Small odd-half-frequency energy supports the selected fundamental rather than an octave-lower fundamental; this remains an estimate, not a ground-truth laryngeal measurement."
+      }
+    },
+    {
+      "chant": "UUU",
+      "sourceFile": "UUU.wav",
+      "sourceSHA256": "a0ab23ca22980b30871dac9c02fcaf02b1423b2d8b02156b4f7a11d476afcb21",
+      "sampleRate": 48000,
+      "durationSeconds": 15.88,
+      "voicedF0Hz": {
+        "p05": 118.0836,
+        "median": 119.9514,
+        "p95": 121.2623
+      },
+      "selectedF0Hz": {
+        "p05": 117.829,
+        "median": 119.0884,
+        "p95": 119.9221
+      },
+      "sourcePitchVariationPercent": 0.607,
+      "sourceTrimSeconds": [
+        0.875,
+        3.803
+      ],
+      "medianHarmonicToFundamentalEnergy": 3.1937,
+      "sourcePeak": 0.09106,
+      "model": "chants/UUU.json",
+      "spectralFrames": 16,
+      "processing": [
+        "DC removed before analysis",
+        "Silence and low-periodicity frames excluded",
+        "Stable voiced segment selected",
+        "Spectral-only model discards background/unvoiced noise",
+        "Runtime output RMS-normalized with peak cap",
+        "Continuous circular crossfade, no raw recording loop"
+      ],
+      "kind": "sustained",
+      "naturalRecording": {
+        "asset": "chants/UUU-natural.wav",
+        "durationSeconds": 2.848,
+        "sourceTrimSeconds": [
+          0.875,
+          3.803
+        ],
+        "rms": 0.279031,
+        "peak": 0.541351,
+        "dcMean": 2e-08,
+        "loopBoundaryAdjacentSampleDelta": 0.018402,
+        "loopCrossfadeSeconds": 0.08,
+        "processing": "Actual recorded PCM, no pitch shift; DC removal, gentle soft limiting, 20 Hz rumble/DC high-pass, RMS normalization, and loop/phrase edge treatment.",
+        "noiseCaveat": "No reference noise-only recording exists, so no objective SNR improvement is claimed."
+      },
+      "octaveAudit": {
+        "selectedF0Hz": 119.0884,
+        "oddHalfFrequencyBandsToSelectedHarmonicsPowerRatio": 2.302e-05,
+        "interpretation": "Small odd-half-frequency energy supports the selected fundamental rather than an octave-lower fundamental; this remains an estimate, not a ground-truth laryngeal measurement."
+      }
+    },
+    {
+      "chant": "AAA",
+      "sourceFile": "AAA.wav",
+      "sourceSHA256": "e353f184526bf2f7065a02eece64b2ee51ae952fd605be718557a4d208b70ee9",
+      "sampleRate": 48000,
+      "durationSeconds": 15.66,
+      "voicedF0Hz": {
+        "p05": 117.6626,
+        "median": 118.7875,
+        "p95": 120.4363
+      },
+      "selectedF0Hz": {
+        "p05": 118.2346,
+        "median": 119.669,
+        "p95": 121.1147
+      },
+      "sourcePitchVariationPercent": 0.765,
+      "sourceTrimSeconds": [
+        1.35,
+        4.253
+      ],
+      "medianHarmonicToFundamentalEnergy": 8.8525,
+      "sourcePeak": 0.09027,
+      "model": "chants/AAA.json",
+      "spectralFrames": 16,
+      "processing": [
+        "DC removed before analysis",
+        "Silence and low-periodicity frames excluded",
+        "Stable voiced segment selected",
+        "Spectral-only model discards background/unvoiced noise",
+        "Runtime output RMS-normalized with peak cap",
+        "Continuous circular crossfade, no raw recording loop"
+      ],
+      "kind": "sustained",
+      "naturalRecording": {
+        "asset": "chants/AAA-natural.wav",
+        "durationSeconds": 2.823,
+        "sourceTrimSeconds": [
+          1.35,
+          4.253
+        ],
+        "rms": 0.278492,
+        "peak": 0.695435,
+        "dcMean": 0.0,
+        "loopBoundaryAdjacentSampleDelta": 0.027496,
+        "loopCrossfadeSeconds": 0.08,
+        "processing": "Actual recorded PCM, no pitch shift; DC removal, gentle soft limiting, 20 Hz rumble/DC high-pass, RMS normalization, and loop/phrase edge treatment.",
+        "noiseCaveat": "No reference noise-only recording exists, so no objective SNR improvement is claimed."
+      },
+      "octaveAudit": {
+        "selectedF0Hz": 119.669,
+        "oddHalfFrequencyBandsToSelectedHarmonicsPowerRatio": 4.087e-05,
+        "interpretation": "Small odd-half-frequency energy supports the selected fundamental rather than an octave-lower fundamental; this remains an estimate, not a ground-truth laryngeal measurement."
+      }
+    }
+  ]
+}

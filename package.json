@@ -1,12 +1,12 @@
 {
   "name": "vibrasound-neural-aligner",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "description": "An evidence-informed frequency generator with precise audio and flowing visuals.",
   "scripts": {
     "dev": "python3 -m http.server 8788 --bind 0.0.0.0 --directory dist",
     "test": "node --test tests/*.test.mjs",
-    "check": "node --check dist/app.js && node --check dist/audio-engine.js && node --check dist/visualizer.js && node --check dist/octave-color.js"
+    "check": "node --check dist/app.js && node --check dist/audio-engine.js && node --check dist/visualizer.js && node --check dist/octave-color.js && node --check dist/mystic-presets.js && node --check dist/chant-engine.js && node --check dist/chant-worklet.js"
   }
 }
