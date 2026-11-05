@@ -1,0 +1,62 @@
+{
+  "passed": true,
+  "browserErrors": [],
+  "binaural": {
+    "samplesPerChannel": 192000,
+    "sampleRate": 48000,
+    "peak": 0.03999999910593033,
+    "stereoDelta": 0.07999999448657036,
+    "leftWaveformRelativeError": 0.0001413220724025273,
+    "rightWaveformRelativeError": 0.000051349509905944615,
+    "left525Amplitude": 0.039999991286717204,
+    "left531Amplitude": 5.99417378985847e-8,
+    "right525Amplitude": 2.1356472352984842e-8,
+    "right531Amplitude": 0.03999998961815348,
+    "carrier528Amplitude": 1.195457529835647e-7,
+    "lowerSideband522Amplitude": 1.188732322724965e-7,
+    "upperSideband534Amplitude": 4.0069413411742566e-8,
+    "accidental6000HzAmplitude": 1.0965120177586377e-10,
+    "leftFrequencyHz": 524.9999912163952,
+    "rightFrequencyHz": 531.0000037265077
+  },
+  "isochronic": {
+    "samplesPerChannel": 192000,
+    "sampleRate": 48000,
+    "peak": 0.03998967260122299,
+    "stereoDelta": 0,
+    "leftWaveformRelativeError": 0.00004368723590945693,
+    "rightWaveformRelativeError": 0.00004368723590945693,
+    "left525Amplitude": 1.4467515073927633e-8,
+    "left531Amplitude": 1.0997572609640967e-8,
+    "right525Amplitude": 1.4467515073927633e-8,
+    "right531Amplitude": 1.0997572609640967e-8,
+    "carrier528Amplitude": 0.020000010727929247,
+    "lowerSideband522Amplitude": 0.009999982295527931,
+    "upperSideband534Amplitude": 0.010000006362307906,
+    "accidental6000HzAmplitude": 1.4815278721458408e-10
+  },
+  "modulatedBinaural": {
+    "samplesPerChannel": 192000,
+    "sampleRate": 48000,
+    "peak": 0.03999488428235054,
+    "stereoDelta": 0.03078998625278473,
+    "leftWaveformRelativeError": 0.0001402645322336604,
+    "rightWaveformRelativeError": 0.0000510741352458846,
+    "left525Amplitude": 0.020000011567654904,
+    "left531Amplitude": 0.01000003213906133,
+    "right525Amplitude": 0.010000007519156447,
+    "right531Amplitude": 0.02000001053596115,
+    "carrier528Amplitude": 3.822873388008874e-8,
+    "lowerSideband522Amplitude": 4.121710904166008e-8,
+    "upperSideband534Amplitude": 5.705002619868124e-8,
+    "accidental6000HzAmplitude": 1.0451882588616004e-10
+  },
+  "lifecycle": {
+    "runningClock": 0.19558956916099773,
+    "pausedClock": 0.33781179138321993,
+    "stillPausedClock": 0.33781179138321993,
+    "pausedState": "paused",
+    "resumedClock": 0.5554988662131519,
+    "finalState": "stopped"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "name": "vibrasound-neural-aligner",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Um espaço de pausa com áudio preciso e visuais imersivos.",
+  "scripts": {
+    "dev": "python3 -m http.server 8788 --bind 0.0.0.0 --directory dist",
+    "test": "node --test tests/*.test.mjs",
+    "check": "node --check dist/app.js && node --check dist/audio-engine.js && node --check dist/visualizer.js"
+  }
+}
