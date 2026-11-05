@@ -6,7 +6,7 @@ Um espaço minimalista de pausa: áudio binaural ou isocrônico gerado em tempo 
 
 ## Usar
 
-Escolha o ritmo, a frequência base, o modo sonoro e a cor. Inicie a sessão: os controles desaparecem após alguns segundos e voltam ao mover o cursor, tocar ou navegar pelo teclado.
+A aplicação abre diretamente no painel, com a logo no topo. Escolha o ritmo, a frequência base, o modo sonoro e a cor. Inicie a sessão: os controles desaparecem após alguns segundos e voltam ao mover o cursor, tocar ou navegar pelo teclado.
 
 - Preset inicial: portadora **528 Hz** e ritmo **6 Hz**.
 - Binaural: **525 Hz no canal esquerdo / 531 Hz no direito**. Use fones estéreo.
@@ -17,7 +17,7 @@ Escolha o ritmo, a frequência base, o modo sonoro e a cor. Inicie a sessão: os
 - Espaço pausa/retoma; Esc encerra. Ao trocar de aba, a sessão pausa.
 - Preferências ficam apenas no navegador. A sincronização luminosa nunca é restaurada automaticamente.
 
-O padrão visual é contínuo, sem flashes rítmicos. A luz sincronizada é uma escolha explícita nos ajustes finos. **Luz pulsante pode provocar crises em pessoas fotossensíveis**, inclusive quando chamada de “suave”. Use volume confortável.
+O padrão visual é contínuo, sem flashes rítmicos. “Sincronizar visual ao ritmo” é uma escolha explícita nos ajustes finos: tamanho, movimento e brilho acompanham a fase do áudio. **Luz e padrões pulsantes podem provocar crises em pessoas fotossensíveis**, inclusive quando chamados de “suaves”. Use volume confortável.
 
 ## Precisão e limites
 
@@ -31,6 +31,8 @@ visual(t) = 0.5 + 0.3 cos(2πft)
 ```
 
 A intensidade visual reduz a contribuição luminosa da envoltória. O modo Órbitas usa curvas de Lissajous como representação matemática, sem alegação terapêutica. O renderizador usa `requestAnimationFrame`, resolução limitada e qualidade adaptativa para buscar fluidez próxima de 60 FPS; o hardware e o navegador determinam o resultado. O áudio e o cálculo visual compartilham o relógio `AudioContext.currentTime`. Taxa de atualização da tela, latência de saída e Bluetooth impedem garantir sincronização física exata entre som e luz.
+
+A sincronização visual exige taxa de quadros medida maior que duas vezes o ritmo solicitado. Por exemplo, uma tela de 60 Hz não pode representar um pulso de 40 Hz fielmente: a opção fica indisponível e o visual permanece contínuo, com o limite indicado no painel. A frequência sonora não é alterada. O renderizador também interrompe a pulsação se o desempenho cair abaixo desse limite.
 
 A renderização real dos três modos foi comparada às fórmulas amostra por amostra, em 48 kHz. O relatório e o procedimento para repetir essa verificação estão em [validation/](validation/README.md).
 

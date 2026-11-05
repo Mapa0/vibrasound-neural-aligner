@@ -95,6 +95,10 @@ export class CosmicVisualizer {
     this.frame = requestAnimationFrame(this.render);
   }
 
+  get frameRate() {
+    return 1000 / this.frameAverage;
+  }
+
   destroy() {
     this.running = false;
     cancelAnimationFrame(this.frame);
@@ -132,7 +136,7 @@ export class CosmicVisualizer {
     }
   }
 
-  drawOrbits(t, cx, cy, radius, pulse, effect) {
+  drawOrbits(t, cx, cy, radius, pulse, effect, phaseShift = 0) {
     const c = this.ctx;
     c.save();
     c.translate(cx, cy);
@@ -144,7 +148,7 @@ export class CosmicVisualizer {
       c.strokeStyle = `rgba(${this.rgb},${k === 0 ? 0.22 : 0.09})`;
       c.lineWidth = k === 0 ? 0.65 : 0.45;
       c.stroke();
-      const angle = t * (0.035 + k * 0.008) + k * 2.1;
+      const angle = t * (0.035 + k * 0.008) + k * 2.1 + phaseShift * 0.12;
       const x = Math.cos(angle) * size, y = Math.sin(angle) * radius * (0.34 + k * 0.045);
       c.globalAlpha = 0.6;
       c.drawImage(this.sprite, x - 6, y - 6, 12, 12);
@@ -159,8 +163,8 @@ export class CosmicVisualizer {
       c.beginPath();
       for (let i = 0; i <= 520; i++) {
         const a = (i / 520) * TAU;
-        const x = Math.sin(a * 3 + t * 0.025 + layer * 0.18) * radius * 0.84;
-        const y = Math.sin(a * 2 + layer * 0.18) * radius * 0.82;
+        const x = Math.sin(a * 3 + t * 0.025 + layer * 0.18 + phaseShift * 0.09) * radius * 0.84;
+        const y = Math.sin(a * 2 + layer * 0.18 - phaseShift * 0.09) * radius * 0.82;
         if (i === 0) c.moveTo(x, y); else c.lineTo(x, y);
       }
       c.strokeStyle = `rgba(${this.pale},${(0.12 + pulse * 0.1) / (layer + 1)})`;
@@ -182,14 +186,18 @@ export class CosmicVisualizer {
     const motion = this.reduceMotion ? 0 : t;
     const frequency = Number(config.target) || 6;
     const intensity = clamp(Number(config.intensity ?? 0.18), 0, 1);
-    const pulsing = active && config.pulseEnabled !== false && !this.reduceMotion;
+    // A display cannot represent a rhythm at or above half its frame rate.
+    const pulsing = active && config.pulseEnabled === true && frequency < this.frameRate / 2 && !this.reduceMotion;
     const envelope = pulsing ? opacityAt(frequency, t) : 0.5;
     const modulation = (envelope - 0.5) * intensity;
-    const cx = this.width * (immersive || this.mobile ? 0.5 : 0.70);
-    const cy = immersive ? this.height * 0.49 : this.mobile ? Math.min(450, this.height * 0.54) : Math.min(350, this.height * 0.42);
+    const coherentPhase = pulsing ? Math.cos(TAU * frequency * t) * intensity : 0;
+    const quadraturePhase = pulsing ? Math.sin(TAU * frequency * t) * intensity : 0;
+    const cx = this.width * 0.5;
+    const cy = immersive ? this.height * 0.49 : this.mobile ? this.height * 0.28 : Math.min(this.height * 0.33, 330);
     const radius = immersive
       ? Math.min(this.width * 0.275, this.height * 0.335, 340)
-      : this.mobile ? Math.min(this.width * 0.26, 104) : Math.min(this.width * 0.18, this.height * 0.235, 240);
+      : this.mobile ? Math.min(this.width * 0.29, this.height * 0.18, 130) : Math.min(this.width * 0.22, this.height * 0.25, 270);
+    const animatedRadius = radius * (1 + 0.12 * coherentPhase);
     const c = this.ctx;
     this.drawBackground(motion, cx, cy, radius);
 
@@ -197,7 +205,7 @@ export class CosmicVisualizer {
     this.glow(cx, cy, radius * 1.1, 0.096 + modulation * 0.025);
     this.glow(cx - radius * 0.5, cy - radius * 0.44, radius * 0.7, 0.111);
     this.glow(cx + radius * 0.48, cy + radius * 0.36, radius * 0.7, 0.093);
-    this.drawOrbits(motion, cx, cy, radius, envelope, config.effect);
+    this.drawOrbits(motion, cx, cy, animatedRadius, envelope, config.effect, quadraturePhase);
 
     const rotate = -0.38 + Math.sin(motion * 0.018) * 0.05;
     const rzCos = Math.cos(rotate), rzSin = Math.sin(rotate);
@@ -237,8 +245,8 @@ export class CosmicVisualizer {
       const xx = x * rzCos - yy * rzSin;
       const rotatedY = x * rzSin + yy * rzCos;
       const perspective = 3.5 / (3.5 - zz);
-      const sx = cx + xx * radius * perspective;
-      const sy = cy + rotatedY * radius * perspective;
+      const sx = cx + xx * animatedRadius * perspective;
+      const sy = cy + rotatedY * animatedRadius * perspective;
       const depth = clamp((zz + 0.8) / 1.6, 0, 1);
       const shimmer = 0.86 + Math.sin(motion * 0.16 + data[p + 5] * TAU) * 0.14;
       const density = data[p + 3] >= 0.76 && data[p + 3] < 0.95 ? 0.42 : data[p + 3] >= 0.95 ? 0.28 : 1;

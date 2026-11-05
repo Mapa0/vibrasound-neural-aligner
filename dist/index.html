@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#09090e">
-  <meta name="description" content="Encontre a sua frequência. Áudio binaural e isocrônico, frequências personalizáveis e um universo de visuais para acompanhar sua pausa.">
-  <title>Vibrasound — Encontre a sua frequência</title>
+  <meta name="description" content="Áudio binaural e isocrônico, frequências personalizáveis e um universo de visuais para acompanhar sua pausa.">
+  <title>Vibrasound — Neural Aligner</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/styles.css">
 </head>
@@ -15,14 +15,9 @@
   <div class="setup" id="setup">
     <header class="site-header">
       <a class="brand" href="/" aria-label="Vibrasound início"><img src="/favicon.svg" alt="" width="36" height="36"><span>vibrasound<span class="brand-sub">NEURAL ALIGNER</span></span></a>
-      <nav aria-label="Navegação principal"><span class="nav-current">O espaço</span><button class="text-button about-trigger" type="button">Sobre a experiência <span aria-hidden="true">↗</span></button></nav>
-      <span class="live-indicator"><span></span> UM TEMPO PARA VOCÊ</span>
+      <nav aria-label="Navegação principal"><button class="text-button about-trigger" type="button">Sobre a experiência <span aria-hidden="true">↗</span></button></nav>
     </header>
     <main>
-      <section class="hero" aria-labelledby="hero-title">
-        <div class="hero-copy"><p class="eyebrow"><span class="tiny-orbit" aria-hidden="true">✳</span> MENOS RUÍDO. MAIS PRESENÇA.</p><h1 id="hero-title">Encontre a sua<br><em>frequência.</em></h1><p class="hero-description">O som encontra a luz.<br>Você encontra um pouco de silêncio.</p><span class="hero-footnote"><span class="sound-bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span> Respire. O resto pode esperar.</span></div>
-        <div class="orb-annotation" aria-hidden="true"><span class="orb-label"><span></span> CAMPO DE RESSONÂNCIA</span><div class="orb-coordinate"><span id="orb-carrier">528</span><small>Hz</small><i> / </i><span id="orb-target">6</span><small>Hz</small></div><span class="orb-bottom">SOM · LUZ · PRESENÇA</span></div>
-      </section>
       <section class="session-dock" aria-label="Configurar sua sessão">
         <div class="dock-heading"><p><span class="small-spark" aria-hidden="true">✧</span> DESENHE A SUA PAUSA</p><div class="presets" aria-label="Presets"><button type="button" class="preset active" data-preset="theta" aria-pressed="true">Theta</button><button type="button" class="preset" data-preset="alpha" aria-pressed="false">Alpha</button><button type="button" class="preset" data-preset="delta" aria-pressed="false">Delta</button></div></div>
         <div class="controls-grid">
@@ -32,12 +27,12 @@
           <div class="control-cell"><label for="effect">04 <span>UNIVERSO VISUAL</span></label><div class="select-value word-value"><select id="effect"><option value="particles">Poeira cósmica</option><option value="orbits">Órbitas harmônicas</option><option value="strobe">Estrobo suave</option></select><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg></div><p id="effect-help">Deixe o olhar flutuar</p></div>
         </div>
         <div class="dock-bottom"><div class="palette-control"><span class="secondary-label">SUA COR</span><div class="swatches" role="group" aria-label="Cor do visualizador"><button class="swatch selected" type="button" data-color="#bea1f1" style="--swatch:#bea1f1" aria-label="Lavanda" aria-pressed="true"></button><button class="swatch" type="button" data-color="#82baf3" style="--swatch:#82baf3" aria-label="Azul lunar" aria-pressed="false"></button><button class="swatch" type="button" data-color="#88cbb5" style="--swatch:#88cbb5" aria-label="Jade" aria-pressed="false"></button><button class="swatch" type="button" data-color="#edbd88" style="--swatch:#edbd88" aria-label="Âmbar" aria-pressed="false"></button><label class="custom-color" title="Escolher outra cor"><span aria-hidden="true">+</span><input id="color" type="color" value="#bea1f1" aria-label="Escolher uma cor personalizada"></label></div></div><div class="duration-control"><label class="secondary-label" for="duration">DURAÇÃO</label><select id="duration"><option value="0">Livre</option><option value="10">10 min</option><option value="20" selected>20 min</option><option value="30">30 min</option><option value="60">60 min</option></select></div><button class="fine-settings" type="button" aria-expanded="false" aria-controls="fine-panel"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16M9 4v6M15 14v6"/></svg>Ajustes finos</button><button id="start" class="start-button" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 11 7-11 7Z"/></svg><span>Iniciar minha pausa</span><span class="button-arrow" aria-hidden="true">↗</span></button></div>
-        <div id="fine-panel" class="fine-panel" hidden><div class="volume-control"><label for="volume">Volume <output id="volume-value">25%</output></label><input type="range" id="volume" min="0" max="100" value="25" aria-label="Volume"><span>Comece com o volume baixo.</span><div id="modulation-control" class="modulation-control"><label class="toggle-label"><input id="binaural-modulation" type="checkbox"><span class="switch" aria-hidden="true"></span><span>Modular o binaural<small id="modulation-rate">Pulsos de volume a 6 Hz</small></span></label></div></div><div class="pulse-control"><label class="toggle-label"><input id="pulse-enabled" type="checkbox"><span class="switch" aria-hidden="true"></span><span>Sincronizar luz ao ritmo <small id="pulse-rate">6 pulsos por segundo</small></span></label><p>Luz pulsante pode provocar crises em pessoas fotossensíveis. Nesse caso, mantenha o fluxo contínuo.</p></div><div class="intensity-control"><label for="intensity">Intensidade visual <output id="intensity-value">25%</output></label><input type="range" id="intensity" min="5" max="60" value="25"></div></div>
-        <p class="strobe-warning" id="strobe-warning" hidden>O estrobo precisa da sincronização de luz. Ative-a nos ajustes finos apenas se você não tiver fotossensibilidade.</p>
+        <div id="fine-panel" class="fine-panel" hidden><div class="volume-control"><label for="volume">Volume <output id="volume-value">25%</output></label><input type="range" id="volume" min="0" max="100" value="25" aria-label="Volume"><span>Comece com o volume baixo.</span><div id="modulation-control" class="modulation-control"><label class="toggle-label"><input id="binaural-modulation" type="checkbox"><span class="switch" aria-hidden="true"></span><span>Modular o binaural<small id="modulation-rate">Pulsos de volume a 6 Hz</small></span></label></div></div><div class="pulse-control"><label class="toggle-label"><input id="pulse-enabled" type="checkbox"><span class="switch" aria-hidden="true"></span><span>Sincronizar visual ao ritmo <small id="pulse-rate">6 pulsos por segundo</small></span></label><p>Luz e padrões pulsantes podem provocar crises em pessoas fotossensíveis. Nesse caso, mantenha o fluxo contínuo.</p></div><div class="intensity-control"><label for="intensity">Intensidade visual <output id="intensity-value">25%</output></label><input type="range" id="intensity" min="5" max="60" value="25"></div></div>
+        <p class="strobe-warning" id="strobe-warning" hidden>O estrobo precisa da sincronização visual. Ative-a nos ajustes finos apenas se você não tiver fotossensibilidade.</p>
         <p id="form-error" class="form-error" role="alert" hidden></p>
       </section>
     </main>
-    <footer class="site-footer"><span><span class="footer-dot"></span> Feito para estar presente.</span><span>Sem pressa. Sem distrações.</span><button type="button" class="text-button about-trigger">Som preciso. Experiência pessoal. <span aria-hidden="true">ⓘ</span></button></footer>
+
   </div>
   <section class="session-ui" id="session-ui" aria-label="Sessão em andamento" hidden>
     <div class="session-top"><span class="session-brand">vibrasound</span><span id="session-state"><span class="footer-dot"></span> SUA PAUSA ESTÁ ACONTECENDO</span><button id="exit-session" class="icon-button" type="button" aria-label="Encerrar sessão e voltar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg></button></div>

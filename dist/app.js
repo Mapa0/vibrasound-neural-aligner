@@ -77,10 +77,7 @@ function update() {
   const config = currentConfig();
   const band = bandFor(config.target);
   $('band-name').textContent = band.toUpperCase();
-  $('orb-carrier').textContent = format(config.carrier);
-  $('orb-target').textContent = format(config.target);
-  $('pulse-rate').textContent = reducedMotion ? 'Movimento reduzido ativado no dispositivo' : `${format(config.target)} pulsos por segundo`;
-  $('pulse-enabled').disabled = reducedMotion;
+  updateVisualStatus();
   $('modulation-rate').textContent = `Pulsos de volume a ${format(config.target)} Hz`;
   $('modulation-control').hidden = config.audioMode !== 'binaural';
   $('custom-carrier').hidden = $('carrier').value !== 'custom';
@@ -98,6 +95,14 @@ function update() {
   });
   $('form-error').hidden = true;
   saveSettings();
+}
+function updateVisualStatus() {
+  const target = Number($('target').value);
+  const frameRate = 1000 / (visualizer.frameAverage || (1000 / 60));
+  const unsupported = target >= frameRate / 2;
+  $('pulse-enabled').disabled = reducedMotion || unsupported;
+  if (reducedMotion || unsupported) $('pulse-enabled').checked = false;
+  $('pulse-rate').textContent = reducedMotion ? 'Movimento reduzido ativado no dispositivo' : unsupported ? `${format(target)} Hz exige tela acima de ${format(target * 2)} Hz · fluxo contínuo` : `${format(target)} ciclos por segundo · relógio do áudio`;
 }
 function showToast(message) {
   clearTimeout(toastTimer);
@@ -134,8 +139,8 @@ async function startSession() {
   if (!$('target').checkValidity() || !$('target').value) return showError('Escolha um ritmo entre 0,5 e 40 Hz.');
   if (config.carrier < 100 || config.carrier > 1500 || !Number.isFinite(config.carrier)) return showError('Escolha uma frequência base entre 100 e 1.500 Hz.');
   const estimatedFrameRate = 1000 / (visualizer.frameAverage || (1000 / 60));
-  if (config.pulseEnabled && config.target >= estimatedFrameRate / 2) return showError('A tela não consegue representar esse ritmo de luz com fidelidade. Desative a sincronização luminosa para usar esse ritmo no áudio.');
-  if (config.effect === 'strobe' && !config.pulseEnabled) { setFineSettings(true); return showError('Para o estrobo, leia o aviso e ative a sincronização de luz. Você também pode escolher Poeira cósmica ou Órbitas harmônicas.'); }
+  if (config.pulseEnabled && config.target >= estimatedFrameRate / 2) return showError('A tela não consegue representar esse ritmo visual com fidelidade. Use o fluxo contínuo para manter esse ritmo no áudio.');
+  if (config.effect === 'strobe' && !config.pulseEnabled) { setFineSettings(true); return showError('Para o estrobo, leia o aviso e ative a sincronização visual. Você também pode escolher Poeira cósmica ou Órbitas harmônicas para um fluxo contínuo.'); }
   starting = true;
   $('start').disabled = true;
   try {
@@ -244,7 +249,8 @@ document.addEventListener('visibilitychange', async () => {
 });
 window.addEventListener('pagehide', () => { engine.stop().catch(() => {}); releaseWakeLock(); });
 setInterval(() => {
-  if (!session || ending) return;
+  if (!session) { updateVisualStatus(); return; }
+  if (ending) return;
   const elapsed = engine.elapsed;
   $('session-clock').textContent = clock(elapsed);
   if (session.duration && elapsed >= session.duration) endSession(true);
